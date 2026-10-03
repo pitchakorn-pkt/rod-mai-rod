@@ -24,8 +24,14 @@ type RoutePoint = { lat: number; lng: number; forecast: Forecast | null };
 // พยากรณ์ฝน ณ เวลาที่รถผ่านแต่ละจุดของเส้นทาง (POST /forecast/route)
 function useRouteRain(geometry: LatLng[] | undefined, departure: string | undefined, minutes: number | undefined) {
   const [state, setState] = useState<{ points: RoutePoint[]; outOfRange: boolean } | null>(null);
+  // โหลดทริปใหม่ทุกครั้ง geometry เป็น array ใหม่แม้เส้นเดิม ใช้ key ที่บอกว่าเส้น/เวลาเปลี่ยนจริงแทน ไม่งั้นยิงซ้ำทุกครั้ง
+  const geo = useRef(geometry);
+  geo.current = geometry;
+  const last = geometry?.[geometry.length - 1];
+  const key = geometry?.length ? `${departure}|${minutes}|${geometry.length}|${geometry[0].lat},${geometry[0].lng}|${last?.lat},${last?.lng}` : "";
   useEffect(() => {
-    if (!geometry?.length || !departure || !minutes) return;
+    const geometry = geo.current;
+    if (!key || !geometry?.length || !departure || !minutes) return;
     let live = true;
     setState(null);
     api<{ points: RoutePoint[]; warnings: string[] }>("/forecast/route", {
@@ -38,7 +44,8 @@ function useRouteRain(geometry: LatLng[] | undefined, departure: string | undefi
     return () => {
       live = false;
     };
-  }, [geometry, departure, minutes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
   return state;
 }
 
@@ -163,7 +170,7 @@ function googleMapsUrl(t: LiveTrip["raw"]) {
   return `https://www.google.com/maps/dir/?${q}`;
 }
 
-function TripDetail({ trip, onDeleted, onEdit }: { trip: LiveTrip; onDeleted: () => void; onEdit: () => void }) {
+function TripDetail({ trip, onDeleted, onEdit, note }: { trip: LiveTrip; onDeleted: () => void; onEdit: () => void; note?: string | null }) {
   const plan = trip.plan;
   const { planTrip, deleteTrip, shiftTrip, hazards } = useApp();
   const [routeId, setRouteId] = useState<string | null>(null);
@@ -171,7 +178,10 @@ function TripDetail({ trip, onDeleted, onEdit }: { trip: LiveTrip; onDeleted: ()
   const [shared, setShared] = useState(false);
   const cols = useSplit("trip_cols", [1.45, 1, 0.95], { cssVar: "--trip-cols", min: 0.25, label: "คอลัมน์ทริป" });
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(note ?? null);
+  useEffect(() => {
+    if (note) setError(note);
+  }, [note]);
   const no = tripNo(trip);
 
   async function run(label: string, job: () => Promise<void>) {
@@ -442,6 +452,8 @@ function Trips() {
   const params = useSearchParams();
   const { trips, tripsError, createTrip, updateTrip } = useApp();
   const [editingTrip, setEditingTrip] = useState<LiveTrip | null>(null);
+  // บันทึกทริปแล้วแต่วางแผนไม่สำเร็จ บอกเหตุผลที่ทริปนั้น
+  const [planNote, setPlanNote] = useState<{ id: string; text: string } | null>(null);
   const [sel, setSelState] = useState(params.get("id") ?? "");
   // จำทริปที่เลือกไว้ใน URL รีเฟรชแล้วยังอยู่ทริปเดิม
   function setSel(id: string) {
@@ -453,6 +465,15 @@ function Trips() {
     history.replaceState(null, "", url);
   }
   const [planning, setPlanning] = useState(params.get("new") === "1");
+  // URL เปลี่ยนตอนอยู่หน้านี้อยู่แล้ว (กดการแจ้งเตือน / ลิงก์ "วางแผนไปที่นี่") useState ข้างบนไม่อ่านซ้ำ ต้องตามเอง
+  const idParam = params.get("id");
+  const newParam = params.get("new");
+  useEffect(() => {
+    if (idParam) setSelState(idParam);
+  }, [idParam]);
+  useEffect(() => {
+    if (newParam === "1") setPlanning(true);
+  }, [newParam]);
   // มาจากปุ่ม "วางแผนไปที่นี่" ของที่เที่ยวรอบตัว
   const to = params.get("to")?.split(",").map(Number);
   const preset = to?.length === 2 && to.every(Number.isFinite) ? { lat: to[0], lng: to[1], name: params.get("name") || "ปลายทาง" } : undefined;
@@ -482,7 +503,7 @@ function Trips() {
       </div>
       <div className="trip-body">
         {trip ? (
-          <TripDetail key={trip.trip_id} trip={trip} onDeleted={() => setSel("")} onEdit={() => setEditingTrip(trip)} />
+          <TripDetail key={trip.trip_id} trip={trip} note={planNote?.id === trip.trip_id ? planNote.text : null} onDeleted={() => setSel("")} onEdit={() => setEditingTrip(trip)} />
         ) : (
           <section className="card" style={{ textAlign: "center", padding: 40 }}>
             <img className="qilin-welcome-anim" src="/assets/mascots/trips-qilin-hero.webp" alt="" style={{ width: 120, margin: "0 auto 8px" }} />
@@ -503,7 +524,8 @@ function Trips() {
           initial={toForm(editingTrip)}
           onClose={() => setEditingTrip(null)}
           onCreate={async (t) => {
-            await updateTrip(editingTrip.trip_id, t);
+            const planError = await updateTrip(editingTrip.trip_id, t);
+            setPlanNote(planError ? { id: editingTrip.trip_id, text: planError } : null);
             setSel(editingTrip.trip_id);
             setEditingTrip(null);
           }}
@@ -514,7 +536,8 @@ function Trips() {
           presetDestination={preset}
           onClose={() => setPlanning(false)}
           onCreate={async (t) => {
-            const made = await createTrip(t);
+            const { trip: made, planError } = await createTrip(t);
+            setPlanNote(planError ? { id: made.trip_id, text: planError } : null);
             setSel(made.trip_id);
             setPlanning(false);
           }}

@@ -3063,3 +3063,10 @@ html[data-theme="glass"] .bar { background: rgba(15, 23, 42, 0.1); }
 
 .error-text { color: var(--high); }
 .profile-menu .theme-opt svg { margin-left: 0; color: inherit; }
+
+/* หน้าต่างสร้าง/แก้ทริป (components/PlanTrip.tsx) จอเล็ก: แผนที่อยู่บน ฟอร์มอยู่ล่าง เลื่อนได้ทั้งหน้าต่าง */
+.plan-dialog { position: fixed; z-index: 1700; inset: 4vh 4vw; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr) 420px; overflow: hidden; }
+@media (max-width: 860px) {
+  .plan-dialog { inset: 0; border-radius: 0; grid-template-columns: minmax(0, 1fr); grid-template-rows: 38vh auto; overflow-y: auto; }
+}
+

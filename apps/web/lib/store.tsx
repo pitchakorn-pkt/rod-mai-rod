@@ -81,10 +81,10 @@ type Store = {
   nearbyError: string | null;
   alerts: Alert[];
   reloadTrips: () => Promise<void>;
-  createTrip: (t: NewTrip) => Promise<LiveTrip>;
+  createTrip: (t: NewTrip) => Promise<{ trip: LiveTrip; planError: string | null }>;
   planTrip: (id: string) => Promise<void>;
   deleteTrip: (id: string) => Promise<void>;
-  updateTrip: (id: string, t: NewTrip) => Promise<void>;
+  updateTrip: (id: string, t: NewTrip) => Promise<string | null>;
   shiftTrip: (id: string, hours: number) => Promise<void>;
 };
 
@@ -207,6 +207,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [reloadTrips],
   );
 
+  const planOrReason = (id: string) =>
+    api(`/trips/${id}/plan`, { method: "POST" }).then(
+      () => null,
+      (e: Error) => `บันทึกทริปแล้ว แต่วางแผนไม่สำเร็จ: ${e.message}`,
+    );
+
   const createTrip = useCallback(
     async (t: NewTrip) => {
       const made = await api<ApiTrip>("/trips", {
@@ -214,9 +220,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         body: { origin: t.origin, destination: t.destination, departure_time: t.departure, waypoints: t.stops },
       });
       if (t.title) saveTitle(made.trip_id, t.title);
-      await api(`/trips/${made.trip_id}/plan`, { method: "POST" }).catch(() => {});
+      // ทริปบันทึกแล้วแม้วางแผนไม่สำเร็จ ส่งเหตุผลกลับไปให้หน้าทริปบอกผู้ใช้ (เช่น ระบบหาเส้นทางช้า)
+      const planError = await planOrReason(made.trip_id);
       await reloadTrips();
-      return toTrip(made, titles());
+      return { trip: toTrip(made, titles()), planError };
     },
     [reloadTrips],
   );
@@ -229,8 +236,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         body: { origin: t.origin, destination: t.destination, departure_time: t.departure, waypoints: t.stops },
       });
       saveTitle(id, t.title);
-      await api(`/trips/${id}/plan`, { method: "POST" }).catch(() => {});
+      const planError = await planOrReason(id);
       await reloadTrips();
+      return planError;
     },
     [reloadTrips],
   );
@@ -314,6 +322,9 @@ export function loadDepartures(t: LiveTrip): Promise<Departure[]> {
   const now: Departure = { offset_h: 0, risk_level: t.plan.risk_level, risk_score: t.plan.risk_score, recommendation: t.plan.recommendation };
   depCache[key] ??= api<{ departures: Departure[] }>(`/trips/${t.trip_id}/departures`, { timeoutMs: 100000 })
     .then((d) => [now, ...d.departures])
-    .catch(() => [now]);
+    .catch(() => {
+      delete depCache[key]; // ไม่จำครั้งที่พัง เปิดทริปนี้อีกครั้งจะลองใหม่
+      return [now];
+    });
   return depCache[key];
 }

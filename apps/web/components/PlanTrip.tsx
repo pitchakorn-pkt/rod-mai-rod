@@ -165,12 +165,15 @@ export default function PlanTrip({
     ...stops.map((s, i) => ({ id: `s${i}`, ...s, color: "#22bfc8", label: `แวะ ${i + 1}` })),
     ...(dest ? [{ id: "d", ...dest, color: "#243457", label: "ปลายทาง" }] : []),
   ];
-  const ready = origin && dest && date;
+  // เวลาออกต้องอยู่ในอนาคต (ทริปเดิมที่ผ่านไปแล้วแก้อย่างอื่นได้ ถ้าไม่ได้เปลี่ยนเวลา)
+  const nowInput = toThaiInput(new Date().toISOString());
+  const past = !!date && date < nowInput && date !== (initial ? toThaiInput(initial.departure) : "");
+  const ready = origin && dest && date && !past;
 
   return (
     <>
       <div className="drawer-bg" onClick={onClose} />
-      <section className="card" role="dialog" aria-label={editing ? "แก้ไขทริป" : "วางแผนทริปใหม่"} style={{ position: "fixed", zIndex: 1700, inset: "4vh 4vw", padding: 0, display: "grid", gridTemplateColumns: "minmax(0,1fr) 420px", overflow: "hidden" }}>
+      <section className="card plan-dialog" role="dialog" aria-label={editing ? "แก้ไขทริป" : "วางแผนทริปใหม่"}>
         <div className="map" style={{ borderRadius: 0, border: 0 }}>
           <Map pins={pins} fit={pins.length > 1 ? pins : undefined} onClick={(p) => place({ ...p, name: focus === "stop" ? `จุดแวะ ${stops.length + 1}` : "ตำแหน่งที่เลือก" })} />
           <div className="panel" style={{ top: 16, left: 16, padding: "10px 14px" }}>
@@ -230,7 +233,8 @@ export default function PlanTrip({
           <PlaceInput label="ปลายทาง" value={dest} onPick={(p) => { setDest(p); setFocus("stop"); }} onClear={() => { setDest(null); setFocus("dest"); }} active={focus === "dest"} onFocus={() => setFocus("dest")} />
           <div className="field">
             <label htmlFor="dep">เวลาออกเดินทาง (เวลาไทย)</label>
-            <input id="dep" className="input" type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} />
+            <input id="dep" className="input" type="datetime-local" min={nowInput} value={date} onChange={(e) => setDate(e.target.value)} />
+            {past && <span className="tiny error-text">เวลานี้ผ่านไปแล้ว เลือกเวลาในอนาคต</span>}
           </div>
           <div className="field">
             <label htmlFor="title">ตั้งชื่อทริป (ไม่บังคับ)</label>
