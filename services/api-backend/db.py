@@ -87,6 +87,11 @@ def find_user_by_email(email: str) -> Optional[dict]:
         ).fetchone()
 
 
+def set_password_hash(user_id: str, password_hash: str) -> None:
+    with connection() as conn:
+        conn.execute("UPDATE users SET password_hash = %s WHERE user_id = %s", (password_hash, user_id))
+
+
 def find_user(user_id: str) -> Optional[dict]:
     with connection() as conn:
         return conn.execute(

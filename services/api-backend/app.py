@@ -187,6 +187,8 @@ def login(body: LoginIn, request: Request):
     user = db.find_user_by_email(normalize_email(body.email))
     if user is None or not auth.check_password(body.password, user["password_hash"]):
         raise ApiError("UNAUTHORIZED", "อีเมลหรือรหัสผ่านไม่ถูกต้อง")
+    if auth.needs_rehash(user["password_hash"]):
+        db.set_password_hash(user["user_id"], auth.hash_password(body.password))
     # เลือก field เอง ห้ามส่ง password_hash ออกไป
     return ok({"token": auth.make_token(user["user_id"]),
                "user": {"user_id": user["user_id"], "email": user["email"]}})

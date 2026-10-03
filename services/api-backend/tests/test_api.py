@@ -67,6 +67,18 @@ def test_register_then_login_without_password_hash(client):
     assert me.json()["data"] == reg.json()["data"]
 
 
+def test_old_slow_hash_still_logs_in_and_is_upgraded(client):
+    import bcrypt
+    import db
+    email = f"old-{uuid.uuid4()}@example.com"
+    db.create_user(email, bcrypt.hashpw(b"secret123", bcrypt.gensalt(12)).decode())
+    res = client.post("/api/v1/auth/login", json={"email": email, "password": "secret123"})
+    assert res.json()["error"] is None
+    assert db.find_user_by_email(email)["password_hash"].startswith("$2b$10$")
+    again = client.post("/api/v1/auth/login", json={"email": email, "password": "secret123"})
+    assert again.json()["error"] is None
+
+
 def test_duplicate_email_is_validation_error(client):
     res = client.post("/api/v1/auth/register", json={"email": "demo@example.com", "password": "whatever1"})
     assert res.status_code == 400
