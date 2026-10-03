@@ -100,10 +100,7 @@ def test_fake_token_is_unauthorized(client):
 # ---------- trips ----------
 
 def new_user_header(client) -> dict:
-    email = f"user-{uuid.uuid4()}@example.com"
-    client.post("/api/v1/auth/register", json={"email": email, "password": "secret123"})
-    res = client.post("/api/v1/auth/login", json={"email": email, "password": "secret123"})
-    return {"Authorization": f"Bearer {res.json()['data']['token']}"}
+    return new_user(client)[1]
 
 
 def test_trip_shape_is_unchanged_and_stored(client, auth_header):
@@ -215,7 +212,8 @@ def test_weather_area_outside_thailand_is_rejected_without_calling_upstream(clie
 # ---------- โปรไฟล์: ชื่อและเปลี่ยนรหัสผ่าน ----------
 
 def new_user(client, password="secret123"):
-    email = f"profile-{uuid.uuid4()}@example.com"
+    """สมัครแล้ว login คืน (อีเมล, header)"""
+    email = f"user-{uuid.uuid4()}@example.com"
     client.post("/api/v1/auth/register", json={"email": email, "password": password})
     token = client.post("/api/v1/auth/login", json={"email": email, "password": password}).json()["data"]["token"]
     return email, {"Authorization": f"Bearer {token}"}

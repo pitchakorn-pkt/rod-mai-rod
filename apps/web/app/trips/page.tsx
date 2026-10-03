@@ -31,7 +31,7 @@ function useRouteRain(geometry: LatLng[] | undefined, departure: string | undefi
   const key = geometry?.length ? `${departure}|${minutes}|${geometry.length}|${geometry[0].lat},${geometry[0].lng}|${last?.lat},${last?.lng}` : "";
   useEffect(() => {
     const geometry = geo.current;
-    if (!key || !geometry?.length || !departure || !minutes) return;
+    if (!geometry?.length || !departure || !minutes) return;
     let live = true;
     setState(null);
     api<{ points: RoutePoint[]; warnings: string[] }>("/forecast/route", {

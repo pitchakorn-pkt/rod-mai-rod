@@ -253,7 +253,7 @@ p { margin: 0; }
 .sidebar-mascot p {
   font-size: calc(13px * var(--fs));
   font-weight: 600;
-  color: #ffffff;
+  color: var(--ink);
   max-width: 140px;
   line-height: 1.4;
 }
@@ -717,13 +717,16 @@ html[data-map="dark"] .map, html[data-map="dark"] .map .leaflet-container { back
   transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.pin-beacon-wrap:hover {
+.pin-beacon-wrap:hover,
+.pin-beacon-wrap.selected {
   transform: translate(-50%, -104%) scale(1.1);
+}
+
+.pin-beacon-wrap:hover {
   z-index: 9999 !important;
 }
 
 .pin-beacon-wrap.selected {
-  transform: translate(-50%, -104%) scale(1.1);
   z-index: 10000 !important;
 }
 
@@ -837,10 +840,6 @@ html[data-map="dark"] .map, html[data-map="dark"] .map .leaflet-container { back
   border-bottom: 2px solid #ffffff;
 }
 
-.pin-beacon-wrap.selected .pin-cyber-tip {
-  border-right-color: #ffffff;
-  border-bottom-color: #ffffff;
-}
 
 /* Futuristic Pin Label Badge */
 .pin-label-cool {
@@ -937,7 +936,7 @@ html[data-map="dark"] .map, html[data-map="dark"] .map .leaflet-container { back
 
 .depart .t { font-size: calc(13px * var(--fs)); color: var(--muted); }
 .depart .h { font-size: calc(19px * var(--fs)); font-weight: 700; margin: 2px 0 6px; color: #ffffff; }
-.bar { height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.1); overflow: hidden; margin-top: 8px; }
+.bar { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: 8px; }
 .bar i { display: block; height: 100%; border-radius: 999px; }
 
 /* ---------- Form Controls ---------- */
@@ -1251,11 +1250,11 @@ html[data-map="dark"] .map, html[data-map="dark"] .map .leaflet-container { back
   padding: 6px 14px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid var(--line-strong);
   backdrop-filter: blur(16px);
   font-size: calc(13px * var(--fs));
   font-weight: 600;
-  color: #ffffff;
+  color: var(--ink);
   letter-spacing: 0.02em;
   max-width: 100%;
 }
@@ -2749,7 +2748,8 @@ html[data-sidebar="mini"] .sidebar-mascot img { width: 56px; margin: 0 auto; }
    1. Dark Glass (Default :root)
    2. Light Glass (html[data-theme="glass"])
    ========================================================= */
-.theme-dot { display: block; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--glass-border); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15); }
+/* สีไล่เฉดต้องเริ่มจากขอบนอก ไม่งั้นถูกวาดซ้ำเป็นลายในขอบโปร่งแสง มุมโผล่เป็นเหลี่ยม */
+.theme-dot { display: block; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--glass-border); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15); background-origin: border-box; background-repeat: no-repeat; }
 .theme-menu { position: absolute; right: 0; top: 50px; z-index: 1300; width: max-content; min-width: 220px; padding: 8px; display: grid; gap: 3px; box-shadow: var(--shadow-lg); }
 .theme-opt { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; cursor: pointer; font-size: calc(14px * var(--fs)); font-weight: 500; color: var(--ink); transition: background 0.15s; }
 .theme-opt:hover, .theme-opt.on { background: var(--lime-50); color: var(--lime); font-weight: 600; }
@@ -3048,12 +3048,10 @@ html[data-theme="glass"] .auth-hero .pill { color: var(--ink); background: rgba(
 html[data-theme="glass"] .pb-head.sun { color: #8a5a00; }
 html[data-theme="glass"] .pb-head.aqua { color: #0e7490; }
 
-/* ธีมขาว: ส่วนที่ตั้งตัวหนังสือเป็นสีขาวตายตัว ให้อ่านออกบนพื้นขาว */
-html[data-theme="glass"] .hero2-tag { color: var(--ink); background: rgba(255, 255, 255, 0.75); border-color: var(--line-strong); }
-html[data-theme="glass"] .sidebar-mascot p { color: var(--ink); }
+/* ธีมขาว: ป้ายทริปถัดไปพื้นทึบขึ้น ปุ่ม SOS พื้นเข้มขึ้นให้ตัวขาวอ่านออก */
+html[data-theme="glass"] .hero2-tag { background: rgba(255, 255, 255, 0.75); }
 html[data-theme="glass"] .sos-ghost { background: rgba(0, 0, 0, 0.22); }
 html[data-theme="glass"] .sos-ghost:hover { background: rgba(0, 0, 0, 0.3); }
-html[data-theme="glass"] .bar { background: rgba(15, 23, 42, 0.1); }
 
 /* เมนูบัญชีขวาบน (components/Shell.tsx ProfileMenu) */
 .avatar-btn { all: unset; cursor: pointer; display: block; border-radius: 50%; }
@@ -3070,3 +3068,11 @@ html[data-theme="glass"] .bar { background: rgba(15, 23, 42, 0.1); }
   .plan-dialog { inset: 0; border-radius: 0; grid-template-columns: minmax(0, 1fr); grid-template-rows: 38vh auto; overflow-y: auto; }
 }
 
+
+/* การ์ดทริปถัดไป (หน้าหลัก): ป้าย "ทริปถัดไป" ไม่วิ่งไปใต้น้องกิเลนมุมขวา จอแคบซ่อนฟองคำพูด (ทับป้าย) */
+/* จอใหญ่เว้นที่ให้ทั้งฟองคำพูดและน้องกิเลน (~280px) จอแคบซ่อนฟอง เว้นแค่ที่น้องกิเลน */
+.hero2.has-plan .hero2-tag { max-width: calc(100% - 290px); white-space: normal; }
+@media (max-width: 1100px) {
+  .cheer.corner .cheer-bubble { display: none; }
+  .hero2.has-plan .hero2-tag { max-width: calc(100% - 120px); }
+}

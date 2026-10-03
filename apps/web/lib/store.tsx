@@ -176,19 +176,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
     // ขอตำแหน่งจริง ระหว่างรอใช้กรุงเทพไปก่อนหลัง 4 วิ (หน้าเว็บจะได้ไม่ว่าง) ได้ตำแหน่งจริงเมื่อไหร่ก็ใช้ตำแหน่งจริงแทน
     const fallback = setTimeout(() => loadAround(BANGKOK), 4000);
-    navigator.geolocation?.getCurrentPosition(
-      (pos) => {
-        clearTimeout(fallback);
-        loadAround({ lat: pos.coords.latitude, lng: pos.coords.longitude }, true);
-      },
-      () => {
-        clearTimeout(fallback);
-        loadAround(BANGKOK);
-      },
-      GEO_OPTIONS,
-    );
+    locate().then((p) => {
+      clearTimeout(fallback);
+      if (!p) loadAround(BANGKOK);
+    });
     return () => clearTimeout(fallback);
-  }, [token, reloadTrips, loadAround]);
+  }, [token, reloadTrips, loadAround, locate]);
 
   // โปรไฟล์: ชื่อที่ให้น้องกิเลนเรียก และเปลี่ยนรหัสผ่าน (PATCH /me, POST /me/password)
   const setDisplayName = useCallback(async (name: string) => {

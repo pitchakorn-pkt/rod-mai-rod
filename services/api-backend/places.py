@@ -381,24 +381,25 @@ def nearby(lat: float, lng: float, radius_km: float = NEARBY_RADIUS_KM, kinds: t
         cell = (round(lat, 2), round(lng, 2))
         candidates = _cached_candidates(cell if default else (*cell, radius_km, kinds))
 
-    # OpenStreetMap มักมีที่เดียวกันหลายจุด เก็บจุดที่ใกล้สุด
+    # OpenStreetMap มักมีที่เดียวกันหลายจุด เก็บจุดที่ใกล้สุด (คิดระยะครั้งเดียวต่อที่)
     inside, seen = [], set()
-    for place in sorted(candidates, key=lambda p: haversine_km(here, p)):
-        if haversine_km(here, place) > radius_km:
+    for d, place in sorted(((haversine_km(here, p), p) for p in candidates), key=lambda x: x[0]):
+        if d > radius_km:
             break
         if place["name"] not in seen:
             seen.add(place["name"])
-            inside.append(place)
+            inside.append((d, place))
+            if default and len(inside) == limit:
+                break
     if default or len(inside) <= limit:
-        return inside[:limit]
+        return [p for _, p in inside[:limit]]
     # รัศมีกว้าง: แบ่งเป็นวงตามระยะ หยิบวงละที่ (ใกล้สุดของวงก่อน) วนจนครบ แล้วเรียงใกล้ไปไกลเหมือนเดิม
     rings = [[] for _ in range(NEARBY_RINGS)]
-    for place in inside:
-        rings[min(int(haversine_km(here, place) / radius_km * NEARBY_RINGS), NEARBY_RINGS - 1)].append(place)
+    for d, place in inside:
+        rings[min(int(d / radius_km * NEARBY_RINGS), NEARBY_RINGS - 1)].append((d, place))
     found = []
     while len(found) < limit:
         for ring in rings:
             if ring and len(found) < limit:
                 found.append(ring.pop(0))
-    found.sort(key=lambda p: haversine_km(here, p))
-    return found
+    return [p for _, p in sorted(found, key=lambda x: x[0])]

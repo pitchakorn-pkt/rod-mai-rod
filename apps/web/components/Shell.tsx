@@ -125,18 +125,6 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           <p>ออกเดินทางเมื่อไหร่ ให้น้องกิเลนช่วยเช็กก่อนนะ</p>
           <img className="qilin-mascot-anim" src="/assets/mascots/risk-qilin-navigation.webp" alt="น้องกิเลน" />
         </div>
-        <button
-          className="nav-link"
-          title={mini ? "ออกจากระบบ" : undefined}
-          style={{ marginTop: 6, border: 0, background: "none", textAlign: "left" }}
-          onClick={() => {
-            setToken(null);
-            location.href = "/login";
-          }}
-        >
-          <Icon name="logout" />
-          <span className="nav-text">ออกจากระบบ</span>
-        </button>
       </aside>
 
       <main className="main">{children}</main>
@@ -173,7 +161,7 @@ function ThemePicker() {
   return (
     <div style={{ position: "relative" }}>
       <button className="icon-btn" onClick={() => setOpen(!open)} aria-label="ธีมและขนาดตัวอักษร" aria-expanded={open} title="ธีม ขนาดตัวอักษร และขนาดการ์ด">
-        <span className="theme-dot" style={{ background: current.swatch }} />
+        <span className="theme-dot" style={{ backgroundImage: current.swatch }} />
       </button>
       {open && (
         <div className="theme-menu card" role="menu">
@@ -189,7 +177,7 @@ function ThemePicker() {
                 setOpen(false);
               }}
             >
-              <span className="theme-dot" style={{ background: t.swatch }} />
+              <span className="theme-dot" style={{ backgroundImage: t.swatch }} />
               {t.label}
               {t.id === theme && <Icon name="check" size={15} />}
             </button>
