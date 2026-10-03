@@ -55,7 +55,14 @@ ABBREVIATIONS = {
     "ชร": "เชียงราย",
     # "เขาใหญ่" เฉยๆ Photon ให้เขาใหญ่ที่สังขละบุรี/หัวหินก่อน คนส่วนใหญ่หมายถึงอุทยาน
     "เขาใหญ่": "อุทยานแห่งชาติเขาใหญ่",
+    # มหาวิทยาลัยและโรงพยาบาล (Photon รู้จักแต่ชื่อเต็ม)
+    "มทร": "มหาวิทยาลัยเทคโนโลยีราชมงคล",
+    "ราชมงคล": "มหาวิทยาลัยเทคโนโลยีราชมงคล",
+    "มก": "มหาวิทยาลัยเกษตรศาสตร์",
+    "รพ": "โรงพยาบาล",
 }
+# คำที่มักพิมพ์ติดกับชื่อถัดไป เช่น "ราชมงคลธัญบุรี" (คำอื่นต้องมีจุดคั่น เช่น "มทร.ธัญบุรี")
+PREFIX_WORDS = ("ราชมงคล",)
 
 _cache: dict[str, tuple[float, list[dict]]] = {}
 
@@ -71,8 +78,20 @@ def _fixture(path: Path, section: str) -> dict:
     return json.loads(path.read_text(encoding="utf-8")).get(section, {})
 
 
+def _expand_word(word: str) -> str:
+    if word.rstrip(".") in ABBREVIATIONS:
+        return ABBREVIATIONS[word.rstrip(".")]
+    for short, full in ABBREVIATIONS.items():
+        if word.startswith(short + ".") and len(word) > len(short) + 1:
+            return full + word[len(short) + 1:]
+    for short in PREFIX_WORDS:
+        if word.startswith(short) and len(word) > len(short):
+            return ABBREVIATIONS[short] + word[len(short):]
+    return word
+
+
 def expand(q: str) -> str:
-    return " ".join(ABBREVIATIONS.get(word.rstrip("."), word) for word in q.split())
+    return " ".join(_expand_word(word) for word in q.split())
 
 
 def _detail(p: dict) -> Optional[str]:
@@ -145,7 +164,8 @@ NEARBY_LIMIT = 8
 NEARBY_CACHE_SECONDS = 24 * 60 * 60
 
 NEARBY_MAX_RADIUS_KM = 20
-NEARBY_LIMIT_WIDE = 15  # ขอหมวดอื่นหรือรัศมีกว้าง (แชทแนะนำที่เที่ยวตามแนว)
+NEARBY_LIMIT_WIDE = 20  # ขอหมวดอื่นหรือรัศมีกว้าง (แชทแนะนำที่เที่ยวตามแนว)
+NEARBY_RINGS = 4  # รัศมีกว้าง: เลือกกระจายจากวงใกล้ถึงวงไกล ไม่เอาแต่ที่กระจุกใกล้สุด
 
 # หมวดสถานที่ที่ขอได้ ค่าเริ่มต้น attraction = ที่เที่ยวตาม CONTRACT หัวข้อ 6 (เหมือนเดิม)
 # nwr = node / way / relation (ห้าง ตลาด สวน มักวาดเป็นพื้นที่) ใช้ out center ได้จุดกลาง
@@ -361,14 +381,24 @@ def nearby(lat: float, lng: float, radius_km: float = NEARBY_RADIUS_KM, kinds: t
         cell = (round(lat, 2), round(lng, 2))
         candidates = _cached_candidates(cell if default else (*cell, radius_km, kinds))
 
-    found, seen = [], set()
+    # OpenStreetMap มักมีที่เดียวกันหลายจุด เก็บจุดที่ใกล้สุด
+    inside, seen = [], set()
     for place in sorted(candidates, key=lambda p: haversine_km(here, p)):
         if haversine_km(here, place) > radius_km:
             break
-        # OpenStreetMap มักมีที่เดียวกันหลายจุด เก็บจุดที่ใกล้สุด
         if place["name"] not in seen:
             seen.add(place["name"])
-            found.append(place)
-        if len(found) == limit:
-            break
+            inside.append(place)
+    if default or len(inside) <= limit:
+        return inside[:limit]
+    # รัศมีกว้าง: แบ่งเป็นวงตามระยะ หยิบวงละที่ (ใกล้สุดของวงก่อน) วนจนครบ แล้วเรียงใกล้ไปไกลเหมือนเดิม
+    rings = [[] for _ in range(NEARBY_RINGS)]
+    for place in inside:
+        rings[min(int(haversine_km(here, place) / radius_km * NEARBY_RINGS), NEARBY_RINGS - 1)].append(place)
+    found = []
+    while len(found) < limit:
+        for ring in rings:
+            if ring and len(found) < limit:
+                found.append(ring.pop(0))
+    found.sort(key=lambda p: haversine_km(here, p))
     return found
