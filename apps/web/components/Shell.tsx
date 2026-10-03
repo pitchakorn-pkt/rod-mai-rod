@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Icon from "./Icon";
 import ChatDrawer from "./ChatDrawer";
 import ChatFab from "./ChatFab";
@@ -233,7 +233,7 @@ function ThemePicker() {
 
 export function Topbar({ title, sub, right }: { title: string; sub?: string; right?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
-  const { alerts, email } = useApp();
+  const { alerts } = useApp();
   return (
     <header className="topbar">
       <div className="title">
@@ -266,7 +266,117 @@ export function Topbar({ title, sub, right }: { title: string; sub?: string; rig
           </div>
         )}
       </div>
-      <img className="avatar" src="/assets/shared/qilin-avatar.webp" alt="บัญชีของฉัน" title={email ?? ""} />
+      <ProfileMenu />
     </header>
+  );
+}
+
+// รูปขวาบน: ตั้งชื่อให้น้องกิเลนเรียก เปลี่ยนรหัสผ่าน ออกจากระบบ
+function ProfileMenu() {
+  const { email, displayName, setDisplayName, changePassword } = useApp();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [nameMsg, setNameMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pw, setPw] = useState({ current: "", next: "", again: "" });
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  // เปิดเมนูใหม่ทุกครั้ง เริ่มจากชื่อปัจจุบัน ไม่ค้างข้อความเก่า (ไม่ผูกกับ displayName ไม่งั้นบันทึกแล้วข้อความหาย)
+  useEffect(() => {
+    if (!open) return;
+    setName(displayName ?? "");
+    setNameMsg(null);
+    setPwMsg(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+
+  async function saveName(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await setDisplayName(name);
+      setNameMsg({ ok: true, text: name.trim() ? "บันทึกแล้ว น้องกิเลนจะเรียกชื่อนี้" : "ลบชื่อแล้ว" });
+    } catch (err) {
+      setNameMsg({ ok: false, text: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function savePassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (pw.next !== pw.again) return setPwMsg({ ok: false, text: "รหัสผ่านใหม่สองช่องไม่ตรงกัน" });
+    setBusy(true);
+    try {
+      await changePassword(pw.current, pw.next);
+      setPw({ current: "", next: "", again: "" });
+      setPwMsg({ ok: true, text: "เปลี่ยนรหัสผ่านแล้ว" });
+    } catch (err) {
+      setPwMsg({ ok: false, text: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ position: "relative" }} ref={box}>
+      <button className="avatar-btn" onClick={() => setOpen(!open)} aria-label="บัญชีของฉัน" aria-expanded={open} title="บัญชีของฉัน">
+        <img className="avatar" src="/assets/shared/qilin-avatar.webp" alt="" />
+      </button>
+      {open && (
+        <div className="card profile-menu" role="dialog" aria-label="บัญชีของฉัน">
+          <div className="row nowrap" style={{ gap: 10, marginBottom: 12 }}>
+            <img className="avatar" src="/assets/shared/qilin-avatar.webp" alt="" />
+            <div style={{ minWidth: 0 }}>
+              <p className="bold ellipsis">{displayName || email?.split("@")[0]}</p>
+              <p className="tiny muted ellipsis">{email}</p>
+            </div>
+          </div>
+          <form className="stack" style={{ gap: 6 }} onSubmit={saveName}>
+            <label className="label" htmlFor="profile-name">
+              ชื่อที่ให้น้องกิเลนเรียก
+            </label>
+            <div className="row nowrap" style={{ gap: 6 }}>
+              <input id="profile-name" className="input" value={name} maxLength={40} placeholder="เช่น แพนด้า" onChange={(e) => setName(e.target.value)} />
+              <button className="btn sm" disabled={busy || name.trim() === (displayName ?? "")}>
+                บันทึก
+              </button>
+            </div>
+            {nameMsg && <p className={`tiny ${nameMsg.ok ? "ok-text" : "error-text"}`}>{nameMsg.text}</p>}
+          </form>
+          <button className="theme-opt" style={{ marginTop: 10 }} onClick={() => setPwOpen(!pwOpen)} aria-expanded={pwOpen}>
+            <Icon name="lock" size={16} />
+            เปลี่ยนรหัสผ่าน
+          </button>
+          {pwOpen && (
+            <form className="stack" style={{ gap: 6, marginTop: 6 }} onSubmit={savePassword}>
+              <input className="input" type="password" autoComplete="current-password" placeholder="รหัสผ่านเดิม" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} required />
+              <input className="input" type="password" autoComplete="new-password" placeholder="รหัสผ่านใหม่ (อย่างน้อย 6 ตัว)" minLength={6} value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} required />
+              <input className="input" type="password" autoComplete="new-password" placeholder="พิมพ์รหัสผ่านใหม่อีกครั้ง" minLength={6} value={pw.again} onChange={(e) => setPw({ ...pw, again: e.target.value })} required />
+              <button className="btn sm" disabled={busy}>
+                {busy ? "กำลังบันทึก..." : "เปลี่ยนรหัสผ่าน"}
+              </button>
+              {pwMsg && <p className={`tiny ${pwMsg.ok ? "ok-text" : "error-text"}`}>{pwMsg.text}</p>}
+            </form>
+          )}
+          <button
+            className="theme-opt"
+            onClick={() => {
+              setToken(null);
+              location.href = "/login";
+            }}
+          >
+            <Icon name="logout" size={16} />
+            ออกจากระบบ
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

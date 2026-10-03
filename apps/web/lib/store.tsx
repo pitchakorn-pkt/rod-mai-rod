@@ -63,6 +63,9 @@ export type LiveTrip = ReturnType<typeof toTrip>;
 type Store = {
   ready: boolean;
   email: string | null;
+  displayName: string | null;
+  setDisplayName: (name: string) => Promise<void>;
+  changePassword: (current: string, next: string) => Promise<void>;
   trips: LiveTrip[];
   tripsError: string | null;
   nextTrip: LiveTrip | null;
@@ -98,6 +101,7 @@ const SEV = { HIGH: 0, MEDIUM: 1, LOW: 2 } as const;
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
+  const [displayName, setDisplayNameState] = useState<string | null>(null);
   const [trips, setTrips] = useState<LiveTrip[]>([]);
   const [tripsError, setTripsError] = useState<string | null>(null);
   const [hazards, setHazards] = useState<Hazard[]>([]);
@@ -152,7 +156,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setReady(true);
       return;
     }
-    api<{ email: string }>("/me").then((u) => setEmail(u.email)).catch(() => {});
+    api<{ email: string; display_name: string | null }>("/me")
+      .then((u) => {
+        setEmail(u.email);
+        setDisplayNameState(u.display_name);
+      })
+      .catch(() => {});
     reloadTrips().finally(() => setReady(true));
     api<{ hazards: Hazard[]; flood_window?: string | null }>(`/hazards?${THAILAND}`)
       .then((d) => {
@@ -180,6 +189,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
     return () => clearTimeout(fallback);
   }, [token, reloadTrips, loadAround]);
+
+  // โปรไฟล์: ชื่อที่ให้น้องกิเลนเรียก และเปลี่ยนรหัสผ่าน (PATCH /me, POST /me/password)
+  const setDisplayName = useCallback(async (name: string) => {
+    const u = await api<{ display_name: string | null }>("/me", { method: "PATCH", body: { display_name: name } });
+    setDisplayNameState(u.display_name);
+  }, []);
+  const changePassword = useCallback(async (current: string, next: string) => {
+    await api("/me/password", { method: "POST", body: { current_password: current, new_password: next } });
+  }, []);
 
   const planTrip = useCallback(
     async (id: string) => {
@@ -258,6 +276,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const value: Store = {
     ready,
     email,
+    displayName,
+    setDisplayName,
+    changePassword,
     trips,
     tripsError,
     nextTrip,

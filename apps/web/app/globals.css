@@ -3054,3 +3054,12 @@ html[data-theme="glass"] .sidebar-mascot p { color: var(--ink); }
 html[data-theme="glass"] .sos-ghost { background: rgba(0, 0, 0, 0.22); }
 html[data-theme="glass"] .sos-ghost:hover { background: rgba(0, 0, 0, 0.3); }
 html[data-theme="glass"] .bar { background: rgba(15, 23, 42, 0.1); }
+
+/* เมนูบัญชีขวาบน (components/Shell.tsx ProfileMenu) */
+.avatar-btn { all: unset; cursor: pointer; display: block; border-radius: 50%; }
+.avatar-btn:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+.profile-menu { position: absolute; right: 0; top: 54px; z-index: 1300; width: 320px; max-width: calc(100vw - 32px); padding: 14px; display: grid; gap: 2px; box-shadow: var(--shadow-lg); }
+.ok-text { color: var(--low); }
+
+.error-text { color: var(--high); }
+.profile-menu .theme-opt svg { margin-left: 0; color: inherit; }
