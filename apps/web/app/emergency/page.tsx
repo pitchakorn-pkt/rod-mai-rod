@@ -235,7 +235,7 @@ export default function Emergency() {
             <div className="guide-grid">
               <article className="guide general">
                 <div className="guide-head">
-                  <span className="guide-icon" style={{ background: "var(--navy)" }}>
+                  <span className="guide-icon">
                     <Icon name="car" size={20} />
                   </span>
                   <div>

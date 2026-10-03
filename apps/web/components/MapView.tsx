@@ -142,7 +142,7 @@ function buildPinIcon(p: MapPin) {
     return divIcon({ className: "pin-div-icon", iconSize: [0, 0], iconAnchor: [0, 0], html });
   }
 
-  const iconMarkup = renderToStaticMarkup(<Icon name={p.icon ?? "pin"} size={isSelected ? 18 : 15} stroke={2.4} />);
+  const iconMarkup = renderToStaticMarkup(<Icon name={p.icon ?? "pin"} size={isSelected ? 16 : 13} stroke={2.4} />);
   const html = `
     <div class="pin-beacon-wrap${isSelected ? " selected" : ""}${isStrong ? " strong" : ""}">
       <div class="pin-sonar-ground" style="--c:${p.color}"></div>
