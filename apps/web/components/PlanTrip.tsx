@@ -141,11 +141,13 @@ export default function PlanTrip({
   initial?: NewTrip;
   presetDestination?: Place;
 }) {
-  const { here } = useApp();
+  const { here, hereFallback, locate } = useApp();
+  const [locating, setLocating] = useState(false);
   const editing = !!initial;
   const [error, setError] = useState<string | null>(null);
   // ไปที่เที่ยวรอบตัว: ต้นทาง = ตำแหน่งปัจจุบัน ปลายทาง = ที่ที่เลือก
-  const [origin, setOrigin] = useState<Place | null>(initial?.origin ?? (presetDestination ? { name: "ตำแหน่งปัจจุบัน", ...here } : null));
+  // ยังไม่ได้ตำแหน่งจริง ไม่เติมต้นทางให้ (ไม่งั้นจะได้กรุงเทพโดยผู้ใช้ไม่รู้ตัว)
+  const [origin, setOrigin] = useState<Place | null>(initial?.origin ?? (presetDestination && !hereFallback ? { name: "ตำแหน่งปัจจุบัน", ...here } : null));
   const [dest, setDest] = useState<Place | null>(initial?.destination ?? presetDestination ?? null);
   const [stops, setStops] = useState<Place[]>(initial?.stops ?? []);
   const [focus, setFocus] = useState<"origin" | "dest" | "stop">(initial || presetDestination ? "stop" : "origin");
@@ -191,9 +193,20 @@ export default function PlanTrip({
                 {n}
               </button>
             ))}
-            <button className="chip" onClick={() => place({ name: "ตำแหน่งปัจจุบัน", ...here })}>
+            <button
+              className="chip"
+              disabled={locating}
+              onClick={async () => {
+                setLocating(true);
+                setError(null);
+                const p = await locate();
+                setLocating(false);
+                if (p) place({ name: "ตำแหน่งปัจจุบัน", ...p });
+                else setError("ใช้ตำแหน่งปัจจุบันไม่ได้ (เบราว์เซอร์ไม่อนุญาตหรือหาตำแหน่งไม่เจอ) พิมพ์ชื่อสถานที่หรือจิ้มบนแผนที่แทน");
+              }}
+            >
               <Icon name="locate" size={14} />
-              ตำแหน่งฉัน
+              {locating ? "กำลังหาตำแหน่ง..." : "ตำแหน่งฉัน"}
             </button>
           </div>
           <PlaceInput label="ต้นทาง" value={origin} onPick={(p) => { setOrigin(p); setFocus(dest ? "stop" : "dest"); }} onClear={() => { setOrigin(null); setFocus("origin"); }} active={focus === "origin"} onFocus={() => setFocus("origin")} />

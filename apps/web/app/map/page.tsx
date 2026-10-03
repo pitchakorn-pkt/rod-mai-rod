@@ -157,7 +157,7 @@ function RiskMap() {
   const [showFlood, setShowFlood] = useState(true);
   const [mapStyle, setMapStyle] = useState<MapStyle>("soft");
   useEffect(() => setMapStyle(getMapStyle()), []);
-  const { hazards: HAZARDS, hazardsError, floodWindow, emergency: EMERGENCY, nextTrip, here } = useApp();
+  const { hazards: HAZARDS, hazardsError, floodWindow, emergency: EMERGENCY, nextTrip, here, locate } = useApp();
   const [selId, setSelId] = useState<string | null>(focus);
   const [showGuide, setShowGuide] = useState(false);
   // จุดที่แผนที่จะบินไป (ตำแหน่งฉัน / ผลค้นหา / หมุดที่เลือก)
@@ -296,7 +296,7 @@ function RiskMap() {
         )}
 
         <div className="map-fab" style={{ right: 16, bottom: 110 }}>
-          <button className="icon-btn" aria-label="ตำแหน่งของฉัน" onClick={() => setFly({ ...here, zoom: 11 })}>
+          <button className="icon-btn" aria-label="ตำแหน่งของฉัน" onClick={async () => setFly({ ...((await locate()) ?? here), zoom: 11 })}>
             <Icon name="locate" />
           </button>
         </div>

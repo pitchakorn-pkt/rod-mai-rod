@@ -21,6 +21,8 @@ export type NewTrip = { title: string; origin: ApiPlace; destination: ApiPlace; 
 export type Alert = { icon: string; tone: "sun" | "red" | "aqua"; text: string; href: string };
 
 const BANGKOK: LatLng = { lat: 13.7563, lng: 100.5018 };
+// คอมพิวเตอร์หาตำแหน่งจาก Wi-Fi อาจใช้เกิน 4 วิ ให้เวลาถึง 15 วิ
+const GEO_OPTIONS: PositionOptions = { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 };
 const THAILAND = "min_lat=5.6&min_lng=97.3&max_lat=20.5&max_lng=105.7";
 const TITLES_KEY = "rmr_redesign_titles";
 
@@ -69,6 +71,8 @@ type Store = {
   floodWindow: string | null; // ชุดน้ำท่วม GISTDA ที่ระบบใช้อยู่ 3days / 7days
   emergency: Record<HazardType, Emergency>;
   here: LatLng;
+  hereFallback: boolean; // true = ยังไม่ได้ตำแหน่งจริง ใช้กรุงเทพแทน
+  locate: () => Promise<LatLng | null>;
   area: Area | null;
   nearby: NearbyPlace[] | null;
   nearbyError: string | null;
@@ -101,9 +105,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [floodWindow, setFloodWindow] = useState<string | null>(null);
   const [emergency, setEmergency] = useState<Record<HazardType, Emergency>>(SAMPLE_EMERGENCY);
   const [here, setHere] = useState<LatLng>(BANGKOK);
+  const [hereFallback, setHereFallback] = useState(true);
   const [area, setArea] = useState<Area | null>(null);
   const [nearby, setNearby] = useState<NearbyPlace[] | null>(null);
   const [nearbyError, setNearbyError] = useState<string | null>(null);
+
+  const loadAround = useCallback((p: LatLng, real = false) => {
+    setHere(p);
+    setHereFallback(!real);
+    api<Area>(`/weather/area?lat=${p.lat}&lng=${p.lng}`).then(setArea).catch(() => {});
+  }, []);
+
+  // ขอตำแหน่งจริงใหม่ (ปุ่ม "ตำแหน่งฉัน") ไม่ได้ = null ให้หน้าเว็บบอกผู้ใช้
+  const locate = useCallback(
+    () =>
+      new Promise<LatLng | null>((resolve) => {
+        if (!navigator.geolocation) return resolve(null);
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            loadAround(p, true);
+            resolve(p);
+          },
+          () => resolve(null),
+          GEO_OPTIONS,
+        );
+      }),
+    [loadAround],
+  );
 
   const reloadTrips = useCallback(async () => {
     try {
@@ -136,33 +165,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .then((g) => setEmergency((m) => ({ ...m, [t]: g })))
         .catch(() => {}),
     );
-    const loadAround = (p: LatLng) => {
-      setHere(p);
-      api<Area>(`/weather/area?lat=${p.lat}&lng=${p.lng}`).then(setArea).catch(() => {});
-    };
-    // ขอตำแหน่งจริง ไม่ให้/ไม่ตอบใน 4 วิ ใช้กรุงเทพฯ
-    let done = false;
-    const fallback = setTimeout(() => {
-      done = true;
-      loadAround(BANGKOK);
-    }, 4000);
+    // ขอตำแหน่งจริง ระหว่างรอใช้กรุงเทพไปก่อนหลัง 4 วิ (หน้าเว็บจะได้ไม่ว่าง) ได้ตำแหน่งจริงเมื่อไหร่ก็ใช้ตำแหน่งจริงแทน
+    const fallback = setTimeout(() => loadAround(BANGKOK), 4000);
     navigator.geolocation?.getCurrentPosition(
       (pos) => {
-        if (done) return;
         clearTimeout(fallback);
-        done = true;
-        loadAround({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        loadAround({ lat: pos.coords.latitude, lng: pos.coords.longitude }, true);
       },
       () => {
-        if (done) return;
         clearTimeout(fallback);
-        done = true;
         loadAround(BANGKOK);
       },
-      { timeout: 3500 },
+      GEO_OPTIONS,
     );
     return () => clearTimeout(fallback);
-  }, [token, reloadTrips]);
+  }, [token, reloadTrips, loadAround]);
 
   const planTrip = useCallback(
     async (id: string) => {
@@ -249,6 +266,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     floodWindow,
     emergency,
     here,
+    hereFallback,
+    locate,
     area,
     nearby,
     nearbyError,
