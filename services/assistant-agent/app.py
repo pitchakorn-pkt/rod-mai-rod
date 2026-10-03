@@ -24,6 +24,7 @@ MAX_MESSAGE = 2000
 class ChatIn(BaseModel):
     message: str
     history: list[dict] = []
+    user_name: Optional[str] = None  # ชื่อที่ผู้ใช้ตั้งในโปรไฟล์ (api-backend ส่งมา)
 
 
 def backend(method: str, path: str, authorization: str, json=None, params=None):
@@ -39,6 +40,12 @@ def trips_context(authorization: str) -> str:
         return tools.context_text(backend("GET", "/api/v1/trips", authorization))
     except ApiError:
         return ""
+
+
+def name_context(name: Optional[str]) -> str:
+    if not name:
+        return ""
+    return f"ผู้ใช้ชื่อ {name} เรียกผู้ใช้ว่า คุณ{name} ได้ ถ้าผู้ใช้ถามว่าตัวเองชื่ออะไรให้ตอบชื่อนี้\n"
 
 
 def safety_search(query: str, hazard_types: Optional[list[str]] = None) -> list[dict]:
@@ -68,4 +75,4 @@ def chat(body: ChatIn, authorization: Optional[str] = Header(None)):
         return ok(reply)
     return ok(llm.answer(message, body.history, safety_search(message),
                          lambda name, args: tools.run(name, args, backend, authorization),
-                         context=trips_context(authorization)))
+                         context=name_context(body.user_name) + trips_context(authorization)))

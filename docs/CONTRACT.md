@@ -190,7 +190,9 @@ frontend ต้องแสดงแถบแจ้งเตือนตาม w
 |---|---|---|
 | POST | `/api/v1/auth/register` | สมัคร `{email, password}` |
 | POST | `/api/v1/auth/login` | ได้ `{token, user}` รหัสผิดทุกแบบ (รวมสั้นกว่า 6 ตัว) ได้ `UNAUTHORIZED` "อีเมลหรือรหัสผ่านไม่ถูกต้อง" |
-| GET | `/api/v1/me` | ข้อมูลผู้ใช้ที่ login อยู่ |
+| GET | `/api/v1/me` | ข้อมูลผู้ใช้ที่ login อยู่ `{user_id, email, display_name}` (`display_name` เป็น `null` ถ้ายังไม่ได้ตั้ง) |
+| PATCH | `/api/v1/me` | ตั้งชื่อที่แสดง `{display_name}` ไม่เกิน 40 ตัว ส่งว่างหรือ `null` = ลบชื่อ ได้ผู้ใช้กลับมา น้องกิเลนเรียกผู้ใช้ด้วยชื่อนี้ |
+| POST | `/api/v1/me/password` | เปลี่ยนรหัส `{current_password, new_password}` รหัสเดิมผิดได้ `VALIDATION_ERROR` "รหัสผ่านเดิมไม่ถูกต้อง" ได้ `{"changed": true}` จำกัด 10 ครั้งต่อนาที |
 | GET | `/api/v1/trips` | ทริปทั้งหมดของผู้ใช้ เรียงตามเวลาออกเดินทาง |
 | GET | `/api/v1/trips/upcoming` | ทริปถัดไปที่ยังไม่ถึงเวลาออก หรือ `null` (ใช้ในหน้า Overview) |
 | POST | `/api/v1/trips` | สร้างทริป `{origin, destination, departure_time, waypoints[]}` ยังไม่แพลน |
@@ -206,7 +208,7 @@ frontend ต้องแสดงแถบแจ้งเตือนตาม w
 | POST | `/api/v1/assistant/chat` | `{message, history[]}` ได้ `ChatReply` |
 | GET | `/api/v1/safety/emergency?hazard_type=` | คำแนะนำฉุกเฉินของภัยชนิดนั้น ได้ `Emergency` (แสดงเมื่อเส้นทางหรือหมุดภัยเป็น HIGH) |
 | GET | `/api/v1/places/search?q=` | ค้นสถานที่ในไทยจากชื่อที่พิมพ์ (ช่องปักหมุดในฟอร์มทริป) ได้ `{"places": [Place...]}` ไม่เกิน 5 ตัว (รูปแบบด้านล่าง) |
-| GET | `/api/v1/places/nearby?lat=&lng=[&radius_km=&kinds=]` | สถานที่เที่ยวใกล้ตำแหน่ง ได้ `{"places": [NearbyPlace...]}` เรียงจากใกล้ไปไกล ไม่ส่ง `radius_km`/`kinds` = 5 กม. ไม่เกิน 8 ตัว (แบบเดิม) ส่ง = รัศมี 1-20 กม. ไม่เกิน 15 ตัว (หน้าหลักใช้ 20 กม. แชทใช้ตามแนวที่ผู้ใช้ขอ) |
+| GET | `/api/v1/places/nearby?lat=&lng=[&radius_km=&kinds=]` | สถานที่เที่ยวใกล้ตำแหน่ง ได้ `{"places": [NearbyPlace...]}` เรียงจากใกล้ไปไกล ไม่ส่ง `radius_km`/`kinds` = 5 กม. ไม่เกิน 8 ตัว (แบบเดิม) ส่ง = รัศมี 1-20 กม. ไม่เกิน 20 ตัว เลือกกระจายตั้งแต่วงใกล้ถึงวงไกล (หน้าหลักใช้ 20 กม. แชทใช้ตามแนวที่ผู้ใช้ขอ) |
 
 ### routing-engine
 
@@ -232,7 +234,7 @@ frontend ต้องแสดงแถบแจ้งเตือนตาม w
 
 | Method | Path | ใช้ทำอะไร |
 |---|---|---|
-| POST | `/api/v1/chat` | `{message, history[]}` + header `Authorization` ของผู้ใช้ ได้ `ChatReply` |
+| POST | `/api/v1/chat` | `{message, history[], user_name}` + header `Authorization` ของผู้ใช้ ได้ `ChatReply` (`user_name` = ชื่อในโปรไฟล์ api-backend ใส่ให้ อาจเป็น `null`) |
 
 ### safety-knowledge
 

@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash text NOT NULL,
     created_at    timestamptz NOT NULL DEFAULT now()
 );
+-- ชื่อที่ผู้ใช้ตั้งเอง (น้องกิเลนเรียกชื่อนี้) ฐานข้อมูลเก่าไม่มีคอลัมน์นี้ เพิ่มให้ตอนเปิด
+ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name text;
 
 CREATE TABLE IF NOT EXISTS trips (
     trip_id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -73,7 +75,7 @@ def create_user(email: str, password_hash: str) -> Optional[dict]:
     with connection() as conn:
         return conn.execute(
             "INSERT INTO users (email, password_hash) VALUES (%s, %s) "
-            "ON CONFLICT (email) DO NOTHING RETURNING user_id::text AS user_id, email",
+            "ON CONFLICT (email) DO NOTHING RETURNING user_id::text AS user_id, email, display_name",
             (email, password_hash),
         ).fetchone()
 
@@ -82,9 +84,23 @@ def find_user_by_email(email: str) -> Optional[dict]:
     """มี password_hash ติดมาด้วย ใช้ตอน login เท่านั้น ห้าม return ออกไปตรงๆ"""
     with connection() as conn:
         return conn.execute(
-            "SELECT user_id::text AS user_id, email, password_hash FROM users WHERE email = %s",
+            "SELECT user_id::text AS user_id, email, display_name, password_hash FROM users WHERE email = %s",
             (email,),
         ).fetchone()
+
+
+def set_display_name(user_id: str, display_name: Optional[str]) -> dict:
+    with connection() as conn:
+        return conn.execute(
+            "UPDATE users SET display_name = %s WHERE user_id = %s "
+            "RETURNING user_id::text AS user_id, email, display_name",
+            (display_name, user_id),
+        ).fetchone()
+
+
+def get_password_hash(user_id: str) -> str:
+    with connection() as conn:
+        return conn.execute("SELECT password_hash FROM users WHERE user_id = %s", (user_id,)).fetchone()["password_hash"]
 
 
 def set_password_hash(user_id: str, password_hash: str) -> None:
@@ -95,7 +111,7 @@ def set_password_hash(user_id: str, password_hash: str) -> None:
 def find_user(user_id: str) -> Optional[dict]:
     with connection() as conn:
         return conn.execute(
-            "SELECT user_id::text AS user_id, email FROM users WHERE user_id = %s",
+            "SELECT user_id::text AS user_id, email, display_name FROM users WHERE user_id = %s",
             (user_id,),
         ).fetchone()
 

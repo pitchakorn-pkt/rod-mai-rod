@@ -208,3 +208,14 @@ def test_language_check_only_for_english_questions():
     assert not llm.wrong_language("ไม่มีฝนครับ", "ฝนตกไหม")
     assert not llm.wrong_language("โทร 1669", "1669?")
 
+
+
+def test_display_name_goes_into_the_model_context(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(agent, "safety_search", lambda q: [])
+    monkeypatch.setattr(agent, "trips_context", lambda auth: "")
+    monkeypatch.setattr(agent.llm, "answer", lambda *a, **k: seen.update(k) or {"reply": "ok", "actions": [], "warnings": []})
+    client.post("/api/v1/chat", headers=AUTH, json={"message": "ฉันชื่ออะไร", "user_name": "แพนด้า"})
+    assert "คุณแพนด้า" in seen["context"]
+    client.post("/api/v1/chat", headers=AUTH, json={"message": "ฉันชื่ออะไร"})
+    assert seen["context"] == ""

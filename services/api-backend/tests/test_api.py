@@ -210,3 +210,47 @@ def test_weather_area_outside_thailand_is_rejected_without_calling_upstream(clie
     res = client.get("/api/v1/weather/area", params={"lat": 13.75, "lng": 100.5}, headers=auth_header)
     assert res.status_code == 200
     assert len(calls) == 1
+
+
+# ---------- โปรไฟล์: ชื่อและเปลี่ยนรหัสผ่าน ----------
+
+def new_user(client, password="secret123"):
+    email = f"profile-{uuid.uuid4()}@example.com"
+    client.post("/api/v1/auth/register", json={"email": email, "password": password})
+    token = client.post("/api/v1/auth/login", json={"email": email, "password": password}).json()["data"]["token"]
+    return email, {"Authorization": f"Bearer {token}"}
+
+
+def test_display_name_is_saved_trimmed_and_cleared(client):
+    _, h = new_user(client)
+    assert client.get("/api/v1/me", headers=h).json()["data"]["display_name"] is None
+    res = client.patch("/api/v1/me", headers=h, json={"display_name": "  แพนด้า  "})
+    assert res.json()["data"]["display_name"] == "แพนด้า"
+    assert client.get("/api/v1/me", headers=h).json()["data"]["display_name"] == "แพนด้า"
+    assert client.patch("/api/v1/me", headers=h, json={"display_name": "   "}).json()["data"]["display_name"] is None
+
+
+def test_display_name_too_long_is_validation_error(client):
+    _, h = new_user(client)
+    res = client.patch("/api/v1/me", headers=h, json={"display_name": "ก" * 41})
+    assert res.status_code == 400 and res.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_change_password_needs_the_current_one(client):
+    email, h = new_user(client)
+    wrong = client.post("/api/v1/me/password", headers=h, json={"current_password": "nope12345", "new_password": "newpass99"})
+    assert wrong.status_code == 400 and wrong.json()["error"]["message"] == "รหัสผ่านเดิมไม่ถูกต้อง"
+    good = client.post("/api/v1/me/password", headers=h, json={"current_password": "secret123", "new_password": "newpass99"})
+    assert good.json()["data"] == {"changed": True}
+    assert client.post("/api/v1/auth/login", json={"email": email, "password": "secret123"}).status_code == 401
+    assert client.post("/api/v1/auth/login", json={"email": email, "password": "newpass99"}).json()["error"] is None
+
+
+def test_chat_sends_display_name_to_the_agent(client, monkeypatch):
+    import app as appmod
+    sent = {}
+    monkeypatch.setattr(appmod, "call", lambda *a, **k: sent.update(k) or {"reply": "ok", "actions": []})
+    _, h = new_user(client)
+    client.patch("/api/v1/me", headers=h, json={"display_name": "แพนด้า"})
+    client.post("/api/v1/assistant/chat", headers=h, json={"message": "ฉันชื่ออะไร"})
+    assert sent["json"]["user_name"] == "แพนด้า"
