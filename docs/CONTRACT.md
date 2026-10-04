@@ -381,9 +381,8 @@ frontend ต้องแสดงแถบแจ้งเตือนตาม w
 ## 9. Hosting
 
 - เว็บที่ใช้งานจริงตอนนี้: https://rod-mai-rod.tntproduction.tech รันด้วย `docker compose up -d --build` บนเซิร์ฟเวอร์ที่มีแรมอย่างน้อย 2 GB (ระบบใช้ราว 650 MB ตอนว่าง) อัปเดตด้วย `git pull` แล้วสั่งคำสั่งเดิม
-- สำรอง: Render ตาม `render.yaml` ทั้งระบบเป็น web service เดียว (`deploy/render/Dockerfile` รวมบริการ Python 6 ตัวบน `127.0.0.1:8001-8006` + หน้าเว็บที่พอร์ต `$PORT`) + Render Postgres ต้องใช้แพ็กเกจ Standard (2 GB) ขึ้นไป วิธีทำอยู่ใน `deploy/render/README.md`
 - เปลี่ยนโดเมน: ต้องเพิ่มโดเมนใหม่ใน Google Cloud (Authorized JavaScript origins) ไม่งั้นปุ่มเข้าสู่ระบบด้วย Google ใช้ไม่ได้
-- บริการใหม่ต้องรันได้ทั้งใน docker compose (`http://<ชื่อบริการ>:8000`) และใน container เดียวของ Render (`http://127.0.0.1:800x`) อ่านที่อยู่จาก env เท่านั้น ห้ามเขียนตายตัว
+- บริการใหม่อ่านที่อยู่ของบริการอื่นจาก env เท่านั้น (ใน docker compose คือ `http://<ชื่อบริการ>:8000`) ห้ามเขียนตายตัว
 
 ## 10. LLM (assistant-agent และ risk-decision ถ้าใช้เขียนคำอธิบาย)
 
