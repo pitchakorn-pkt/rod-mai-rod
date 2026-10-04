@@ -1,5 +1,7 @@
 # ขึ้น Render
 
+> เว็บที่ใช้งานจริงตอนนี้รันด้วย `docker compose` บนเซิร์ฟเวอร์ทั่วไป (README หลัก หัวข้อ 6) Render เป็นทางสำรอง
+
 ทั้งระบบเป็น **web service เดียว** (`Dockerfile` ในโฟลเดอร์นี้) + **Render Postgres** ตาม `render.yaml` ที่ root
 
 - บริการ Python 6 ตัวฟังแค่ `127.0.0.1:8001-8006` ภายใน container (`start.sh` ตั้งที่อยู่ให้เอง ทับค่าใน `.env`)
@@ -14,7 +16,7 @@ Postgres ใช้แบบ Free ได้ (หมดอายุตามเง
 ## ขั้นตอน
 
 1. Render > **New > Blueprint** > เลือก repo นี้ Render จะอ่าน `render.yaml` สร้าง web service `rod-mai-rod` + ฐานข้อมูล `rod-mai-rod-db`
-2. ใส่ค่าที่เป็นความลับเองในหน้า **Environment** (ไม่อยู่ใน repo): `GROQ_API_KEY`, `GROQ2_API_KEY` (ใส่ key เดียวกับ `GROQ_API_KEY` ได้), `GEMINI_API_KEY`, `GISTDA_API_KEY`
+2. ใส่ค่าเองในหน้า **Environment** ของ web service `rod-mai-rod` (ไม่ใช่หน้า Blueprint) ค่าเหล่านี้ไม่อยู่ใน repo: `GROQ_API_KEY`, `GROQ2_API_KEY` (ใส่ key เดียวกับ `GROQ_API_KEY` ได้), `GEMINI_API_KEY`, `GISTDA_API_KEY`, `GOOGLE_CLIENT_ID` (และเพิ่มโดเมน `.onrender.com` ใน Google Cloud)
    `JWT_SECRET` Render สุ่มให้เอง `DATABASE_URL` Render ต่อกับฐานข้อมูลให้เอง
 3. กด **Deploy** รอ build ราว 5-8 นาที เสร็จแล้วเปิด `https://<ชื่อ>.onrender.com/health` ต้องได้ `{"status":"ok","service":"web"}`
 4. ตรวจหลังขึ้น: สมัครบัญชีใหม่ > สร้างทริป > กดวางแผน > เปิดแผนที่ (หลังเปิดใหม่ ข้อมูลน้ำท่วมใช้เวลาโหลดราว 1.5 นาที) > ถามน้องกิเลน

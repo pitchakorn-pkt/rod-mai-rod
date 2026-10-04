@@ -118,7 +118,7 @@ frontend ต้องแสดงแถบแจ้งเตือนตาม w
 
 ### Stub ก่อนโค้ดจริง
 
-ทุก service ใน repo มี stub ที่ตอบข้อมูลปลอมตาม endpoint ในหัวข้อ 6 อยู่แล้ว **ห้ามลบ endpoint ออกจาก stub ก่อนมีของจริงมาแทน** คนอื่นกำลังต่ออยู่
+ทุก service ตอบ endpoint ในหัวข้อ 6 ด้วยข้อมูลจริงแล้ว (ช่วงพัฒนาเริ่มจาก stub ที่ตอบรูปแบบเดียวกัน) **ห้ามลบหรือเปลี่ยนรูปแบบ endpoint โดยไม่อัปเดตไฟล์นี้** บริการอื่นพึ่งอยู่
 
 ## 4. รูปแบบข้อมูลกลาง
 
@@ -184,7 +184,7 @@ frontend ต้องแสดงแถบแจ้งเตือนตาม w
 
 ## 6. รายการ endpoint
 
-### api-backend (frontend เรียกแค่ชุดนี้ stub ใน `services/api-backend/` ตอบครบทุกเส้นแล้ว)
+### api-backend (frontend เรียกแค่ชุดนี้)
 
 | Method | Path | ใช้ทำอะไร |
 |---|---|---|
@@ -380,8 +380,9 @@ frontend ต้องแสดงแถบแจ้งเตือนตาม w
 
 ## 9. Hosting
 
-- นำเสนอด้วย `docker compose up` บนเครื่องที่ใช้ demo เป็นหลัก
-- ลิงก์ให้คนนอกใช้: Render ตาม `render.yaml` ทั้งระบบเป็น web service เดียว (`deploy/render/Dockerfile` รวมบริการ Python 6 ตัวบน `127.0.0.1:8001-8006` + หน้าเว็บที่พอร์ต `$PORT`) + Render Postgres วิธีทำอยู่ใน `deploy/render/README.md`
+- เว็บที่ใช้งานจริงตอนนี้: https://rod-mai-rod.tntproduction.tech รันด้วย `docker compose up -d --build` บนเซิร์ฟเวอร์ที่มีแรมอย่างน้อย 2 GB (ระบบใช้ราว 650 MB ตอนว่าง) อัปเดตด้วย `git pull` แล้วสั่งคำสั่งเดิม
+- สำรอง: Render ตาม `render.yaml` ทั้งระบบเป็น web service เดียว (`deploy/render/Dockerfile` รวมบริการ Python 6 ตัวบน `127.0.0.1:8001-8006` + หน้าเว็บที่พอร์ต `$PORT`) + Render Postgres ต้องใช้แพ็กเกจ Standard (2 GB) ขึ้นไป วิธีทำอยู่ใน `deploy/render/README.md`
+- เปลี่ยนโดเมน: ต้องเพิ่มโดเมนใหม่ใน Google Cloud (Authorized JavaScript origins) ไม่งั้นปุ่มเข้าสู่ระบบด้วย Google ใช้ไม่ได้
 - บริการใหม่ต้องรันได้ทั้งใน docker compose (`http://<ชื่อบริการ>:8000`) และใน container เดียวของ Render (`http://127.0.0.1:800x`) อ่านที่อยู่จาก env เท่านั้น ห้ามเขียนตายตัว
 
 ## 10. LLM (assistant-agent และ risk-decision ถ้าใช้เขียนคำอธิบาย)
@@ -395,14 +396,14 @@ frontend ต้องแสดงแถบแจ้งเตือนตาม w
 
 ## 11. Git flow
 
-- `main` เป็น branch หลัก (default) merge เข้าต้องมี 2 approval
-- `dev` เป็น branch รวมงาน merge เข้าต้องมี 1 approval
-- ห้าม push ตรงเข้า `main` หรือ `dev`
+- repo อยู่ที่ `pitchakorn-pkt/rod-mai-rod` (ย้ายมาเมื่อ 3 ต.ค. 2569)
+- `main` เป็น branch หลัก (default) และเป็นตัวที่ขึ้นเว็บจริง · `dev` เป็น branch รวมงาน
+- ruleset ของ `dev` และ `main`: ห้าม push ตรง ห้ามลบ branch ห้าม force push และ **CI (pytest 6 service + smoke) ต้องผ่านก่อน merge** (ตั้งแต่ 3 ต.ค. ไม่บังคับจำนวน approval แล้ว เพื่อให้แก้งานหลัง deploy ได้ทัน)
 - ทุกคนทำงานใน branch ของตัวเอง แตกจาก `dev`: `feature/<module-slug>/<ชื่อ>` เช่น `feature/routing-engine/somchai`
   module-slug: `web-overview`, `web-mytrip`, `web-safety-assistant`, `api-backend`, `routing-engine`, `weather-disaster`, `risk-decision`, `assistant-agent`, `safety-knowledge`
 - commit: `<type>(<module-slug>): <ทำอะไร>` type คือ `feat` `fix` `test` `docs` `refactor` `chore`
-- **ตอนเปิด PR ช่อง base จะเด้งเป็น `main` เสมอ (เพราะ `main` เป็น default) ต้องเปลี่ยนเป็น `dev` เองทุกครั้ง** ถ้าลืม PR จะติดกฎ 2 approval ของ `main` และถูกปิดให้เปิดใหม่
-- เจ้าของโปรเจกต์รีวิวทุก PR ก่อนเข้า `dev` และ `main` (เป็น code owner คนเดียวใน `.github/CODEOWNERS` GitHub จึงไม่ยอมให้ merge จนกว่าเขาจะ approve)
+- **ตอนเปิด PR ช่อง base จะเด้งเป็น `main` เสมอ (เพราะ `main` เป็น default) ต้องเปลี่ยนเป็น `dev` เองทุกครั้ง**
+- code owner ใน `.github/CODEOWNERS` คือ @Patcharanat23 และ @pitchakorn-pkt
 - repo ตั้งให้ merge แบบ "Create a merge commit" อย่างเดียว เพื่อเก็บ commit ของแต่ละคนไว้ครบเป็นหลักฐานการทำงาน
 - ต้องแตะไฟล์นอกโฟลเดอร์ตัวเอง: ขอเจ้าของโฟลเดอร์นั้นก่อนเปิด PR และแท็กเขาใน PR ห้ามพุชหรือ merge มั่ว
 - `dev` ต้องรันได้ตลอดเวลา ถ้า merge แล้วพังให้ revert ทันที (`git revert -m 1 <merge commit>`) ห้าม force push

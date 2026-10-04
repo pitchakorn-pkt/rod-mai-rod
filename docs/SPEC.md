@@ -50,5 +50,6 @@
 - ขอบเขต v1: ประเทศไทยเท่านั้น
 - Local Risk Model แบบ rule-based (ฝน/ลม/แจ้งเตือนภัยพิบัติ) - ดู threshold ใน `docs/CONTRACT.md`
 - Auth: email+password custom, JWT
-- Font: Prompt (Google Fonts)
-- API ฟรีที่เลือกใช้: Longdo Map, Open-Meteo, GDACS, USGS, Thaiwater/HII (bonus), TMD (bonus)
+- Auth เพิ่มเติม: เข้าสู่ระบบด้วย Google (ทำเพิ่ม 4 ต.ค.)
+- Font: เดิมวางไว้เป็น Prompt ตอนนี้ใช้ **Noto Sans Thai** ทั้งเว็บ (เก็บไฟล์ใน repo)
+- API ที่ใช้จริง: OSRM (เส้นทาง), Esri (แผนที่), Open-Meteo, GDACS, USGS, GISTDA (น้ำท่วมจากดาวเทียม), HDMS กรมทางหลวง (ถนนปิด), Photon + Overpass (สถานที่) · Longdo, Thaiwater/HII, TMD ที่วางแผนไว้ยังไม่ได้ต่อ รายละเอียดใน README หัวข้อ 3
