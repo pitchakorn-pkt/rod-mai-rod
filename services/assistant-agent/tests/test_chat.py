@@ -219,3 +219,14 @@ def test_display_name_goes_into_the_model_context(monkeypatch):
     assert "คุณแพนด้า" in seen["context"]
     client.post("/api/v1/chat", headers=AUTH, json={"message": "ฉันชื่ออะไร"})
     assert seen["context"] == ""
+
+
+def test_english_safety_question_is_searched_with_thai_words(monkeypatch):
+    asked = []
+    monkeypatch.setattr(agent, "call", lambda *a, **k: asked.append(k["json"]["query"]) or {"results": []})
+    agent.safety_search("What should I do if my car stalls in flood water?")
+    assert "รถดับกลางน้ำท่วม" in asked[-1] and "น้ำท่วม" in asked[-1]
+    agent.safety_search("รถดับกลางน้ำทำไง")  # ภาษาไทยส่งตามเดิม
+    assert asked[-1] == "รถดับกลางน้ำทำไง"
+    agent.safety_search("hello there")  # อังกฤษแต่ไม่มีคำสำคัญ ส่งตามเดิม
+    assert asked[-1] == "hello there"

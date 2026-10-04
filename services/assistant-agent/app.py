@@ -48,9 +48,36 @@ def name_context(name: Optional[str]) -> str:
     return f"ผู้ใช้ชื่อ {name} เรียกผู้ใช้ว่า คุณ{name} ได้ ถ้าผู้ใช้ถามว่าตัวเองชื่ออะไรให้ตอบชื่อนี้\n"
 
 
+# เอกสารความปลอดภัยเป็นภาษาไทย ตัวค้นเทียบตัวอักษร คำถามภาษาอังกฤษจึงค้นไม่เจอ แปลงคำสำคัญเป็นคำค้นไทยก่อน
+EN_SAFETY_WORDS = [
+    (("stall", "stalled", "engine died", "car died"), "รถดับกลางน้ำท่วม"),
+    (("flood", "flooding", "water on the road"), "น้ำท่วม ขับรถลุยน้ำ"),
+    (("electric", "electrocut", "power line"), "ไฟฟ้า น้ำท่วม"),
+    (("evacuat", "prepare", "emergency kit"), "อพยพ เตรียมตัว น้ำท่วม"),
+    (("road closed", "closure", "highway"), "ถนนปิด ทางหลวง"),
+    (("landslide", "mudslide"), "ดินถล่ม"),
+    (("lightning", "thunder"), "ฟ้าผ่า"),
+    (("storm",), "พายุ"),
+    (("heavy rain", "downpour"), "ฝนตกหนัก"),
+    (("rain",), "ฝนตก ขับรถ"),
+    (("wind",), "ลมแรง"),
+    (("earthquake",), "แผ่นดินไหว"),
+]
+
+
+def thai_safety_query(query: str) -> Optional[str]:
+    """คำถามภาษาอังกฤษ -> คำค้นไทยจากคำสำคัญที่เจอ ไม่ใช่ภาษาอังกฤษหรือไม่เจอคำสำคัญ คืน None"""
+    if sum(c.isascii() for c in query) < 0.8 * len(query):
+        return None
+    low = query.lower()
+    words = [th for keys, th in EN_SAFETY_WORDS if any(k in low for k in keys)]
+    return " ".join(words) if words else None
+
+
 def safety_search(query: str, hazard_types: Optional[list[str]] = None) -> list[dict]:
     """คำแนะนำความปลอดภัยจากเอกสารจริง ใช้ตอบคำถามแบบ "น้ำท่วมต้องทำยังไง" แทนให้ LLM แต่งเอง
     คืน [] ถ้าค้นไม่เจอหรือ safety-knowledge ล่ม ส่ง source ไปให้ LLM อ้างอิงด้วย"""
+    query = thai_safety_query(query) or query
     try:
         data = call("SAFETY_KNOWLEDGE_URL", "POST", "/api/v1/safety/search", timeout=SAFETY_TIMEOUT,
                     json={"query": query, "hazard_types": hazard_types or []})

@@ -73,6 +73,17 @@ SCHEMAS = [
         }, "required": ["place"]},
     }},
     {"type": "function", "function": {
+        "name": "hazards_now",
+        "description": "ภัยที่เกิดอยู่ตอนนี้ทั่วประเทศ หรือในจังหวัดที่ระบุ: น้ำท่วม/ถนนปิดบนทางหลวง (กรมทางหลวง) "
+                       "น้ำท่วมจากดาวเทียม ดินถล่ม แผ่นดินไหว ใช้ตอนผู้ใช้ถาม เช่น ช่วงนี้ที่ไหนน้ำท่วม ถนนไหนปิด "
+                       "โดยไม่ได้ถามรอบสถานที่เดียว (ถามรอบสถานที่ใช้ place_conditions)",
+        "parameters": {"type": "object", "properties": {
+            "province": {"type": "string", "description": "ชื่อจังหวัด เช่น นครสวรรค์ ไม่ระบุ = ทั้งประเทศ"},
+            "hazard_type": {"type": "string", "enum": ["FLOOD", "LANDSLIDE_RISK", "STORM", "EARTHQUAKE"],
+                            "description": "ชนิดภัยที่ถาม ไม่ระบุ = ทุกชนิด"},
+        }},
+    }},
+    {"type": "function", "function": {
         "name": "create_trip",
         "description": "สร้างทริปใหม่แล้ววางแผนเส้นทางให้ทันที ต้องรู้ต้นทาง ปลายทาง วันและเวลาออก ขาดข้อไหนให้ถามก่อน",
         "parameters": {"type": "object", "properties": {
@@ -280,7 +291,7 @@ def emergency_info(args: dict, backend: Backend, auth: str) -> tuple[dict, list]
 
 
 HAZARD_KM = 30  # ภัยที่นับว่า "รอบสถานที่"
-HAZARD_TYPE_TH = {"FLOOD": "น้ำท่วม", "STORM": "พายุ", "EARTHQUAKE": "แผ่นดินไหว", "LANDSLIDE": "ดินถล่ม",
+HAZARD_TYPE_TH = {"FLOOD": "น้ำท่วม", "STORM": "พายุ", "EARTHQUAKE": "แผ่นดินไหว", "LANDSLIDE_RISK": "ดินถล่ม",
                   "HEAVY_RAIN": "ฝนหนัก", "RAIN": "ฝน", "STRONG_WIND": "ลมแรง"}
 
 
@@ -333,6 +344,44 @@ def place_conditions(args: dict, backend: Backend, auth: str) -> tuple[dict, lis
     return out, []
 
 
+THAILAND_BOX = {"min_lat": 5.6, "min_lng": 97.3, "max_lat": 20.5, "max_lng": 105.7}
+SOURCE_TH = {"DOH": "กรมทางหลวง", "GISTDA": "ดาวเทียม GISTDA", "GDACS": "GDACS", "USGS": "USGS", "DERIVED": "ประเมินจากฝนสะสม"}
+SEVERITY_ORDER = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+HAZARDS_NOW_LIMIT = 8
+
+
+def hazards_now(args: dict, backend: Backend, auth: str) -> tuple[dict, list]:
+    """ภัยตอนนี้ทั้งประเทศหรือรายจังหวัด รุนแรงก่อน ถนนปิดของกรมทางหลวงก่อนในระดับเดียวกัน"""
+    feed = backend("GET", "/api/v1/hazards", auth, params=THAILAND_BOX)
+    province = (args.get("province") or "").replace("จังหวัด", "").replace("จ.", "").strip()
+    wanted = args.get("hazard_type")
+    found = []
+    for h in feed.get("hazards", []):
+        if h.get("source") == "OPEN_METEO":  # ฝน/ลมชั่วโมงนี้ ไม่ใช่เหตุที่เกิดค้างอยู่
+            continue
+        if wanted and h.get("hazard_type") != wanted:
+            continue
+        if province and province not in (h.get("province") or "") and province not in (h.get("title_th") or ""):
+            continue
+        found.append(h)
+    found.sort(key=lambda h: (SEVERITY_ORDER.get(h.get("severity"), 3), h.get("source") != "DOH"))
+    high = sum(h.get("severity") == "HIGH" for h in found)
+    closed = sum(h.get("source") == "DOH" and h.get("severity") == "HIGH" for h in found)
+    where = f"จังหวัด{province}" if province else "ทั่วประเทศ"
+    out: dict = {
+        "note": "เป็นข้อมูลตอนนี้ ไม่ใช่พยากรณ์ล่วงหน้า",
+        "summary_th": (f"{where} มีภัย {len(found)} จุด ระดับสูง {high} จุด "
+                       f"(ทางหลวงที่ผ่านไม่ได้หรือน้ำลึกเกิน 35 ซม. {closed} จุด)") if found else f"{where} ไม่มีรายงานภัยตอนนี้",
+        "hazards": [{"title_th": h.get("title_th"), "province": h.get("province"),
+                     "type_th": HAZARD_TYPE_TH.get(h.get("hazard_type"), h.get("hazard_type")),
+                     "severity_th": RISK_TH.get(h.get("severity"), "ไม่ทราบ"),
+                     "source_th": SOURCE_TH.get(h.get("source"), h.get("source"))} for h in found[:HAZARDS_NOW_LIMIT]],
+    }
+    if feed.get("warnings"):
+        out["warnings"] = feed["warnings"]
+    return out, []
+
+
 def create_trip(args: dict, backend: Backend, auth: str, now: Optional[datetime] = None) -> tuple[dict, list]:
     d = YMD.match(str(args.get("date") or "").strip())
     t = HHMM.match(str(args.get("time") or "").strip())
@@ -379,7 +428,7 @@ def update_trip_places(args: dict, backend: Backend, auth: str) -> tuple[dict, l
 
 HANDLERS = {"list_trips": list_trips, "update_trip_time": update_trip_time,
             "plan_trip": plan_trip, "get_trip_weather": get_trip_weather,
-            "nearby_places": nearby_places, "place_conditions": place_conditions, "emergency_info": emergency_info, "create_trip": create_trip, "update_trip_places": update_trip_places}
+            "nearby_places": nearby_places, "place_conditions": place_conditions, "hazards_now": hazards_now, "emergency_info": emergency_info, "create_trip": create_trip, "update_trip_places": update_trip_places}
 
 
 def run(name: str, args: dict, backend: Backend, auth: str) -> tuple[dict, list]:
