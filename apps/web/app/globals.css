@@ -1490,6 +1490,8 @@ html[data-map="dark"] .map, html[data-map="dark"] .map .leaflet-container { back
 
 /* Score Ring */
 .ring { position: relative; width: 88px; height: 88px; flex: none; }
+/* วงกลม 84px อยู่กลางกล่อง 88px (เดิมชิดซ้ายบน ตัวเลขที่จัดกลางกล่องเลยเยื้องขวาและลงล่าง 2px) */
+.ring svg { position: absolute; inset: 0; margin: auto; }
 .ring span { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
 .ring b { font-size: calc(26px * var(--fs)); line-height: 1; color: #ffffff; font-family: var(--font-main); }
 .ring small { font-size: calc(10.5px * var(--fs)); color: var(--muted); margin-top: 2px; }
