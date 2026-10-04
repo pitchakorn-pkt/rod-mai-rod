@@ -190,6 +190,8 @@ frontend ต้องแสดงแถบแจ้งเตือนตาม w
 |---|---|---|
 | POST | `/api/v1/auth/register` | สมัคร `{email, password}` |
 | POST | `/api/v1/auth/login` | ได้ `{token, user}` รหัสผิดทุกแบบ (รวมสั้นกว่า 6 ตัว) ได้ `UNAUTHORIZED` "อีเมลหรือรหัสผ่านไม่ถูกต้อง" |
+| GET | `/api/v1/auth/config` | `{google_client_id}` หน้า login ใช้วาดปุ่ม Google (`null` = ยังไม่ได้ตั้ง `GOOGLE_CLIENT_ID` ไม่แสดงปุ่ม) |
+| POST | `/api/v1/auth/google` | `{credential}` (ID token จากปุ่ม Sign in with Google) ได้ `{token, user}` เหมือน login · อีเมลที่มีบัญชีอยู่แล้ว = เข้าบัญชีเดิม · ครั้งแรกสร้างบัญชีให้พร้อมชื่อจาก Google · token ไม่ถูกต้อง `UNAUTHORIZED` |
 | GET | `/api/v1/me` | ข้อมูลผู้ใช้ที่ login อยู่ `{user_id, email, display_name}` (`display_name` เป็น `null` ถ้ายังไม่ได้ตั้ง) |
 | PATCH | `/api/v1/me` | ตั้งชื่อที่แสดง `{display_name}` ไม่เกิน 40 ตัว ส่งว่างหรือ `null` = ลบชื่อ ได้ผู้ใช้กลับมา น้องกิเลนเรียกผู้ใช้ด้วยชื่อนี้ |
 | POST | `/api/v1/me/password` | เปลี่ยนรหัส `{current_password, new_password}` รหัสเดิมผิดได้ `VALIDATION_ERROR` "รหัสผ่านเดิมไม่ถูกต้อง" ได้ `{"changed": true}` จำกัด 10 ครั้งต่อนาที |

@@ -13,6 +13,8 @@ import { THEMES, applyTheme, getTheme, type Theme } from "@/lib/theme";
 import { TEXT_SIZES, applyTextScale, getTextScale, resetSplits } from "@/lib/layout";
 import { useChat } from "@/lib/chat";
 
+const PUBLIC_PATHS = ["/login", "/privacy", "/terms"];
+
 const NAV = [
   { href: "/", label: "หน้าหลัก", icon: "home" },
   { href: "/trips", label: "ทริปของฉัน", short: "ทริป", icon: "route" },
@@ -76,14 +78,15 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     if (onAssistant) setChatOpen(false);
   }, [onAssistant]);
 
-  // ยังไม่ login พาไปหน้า login
+  // ยังไม่ login พาไปหน้า login (หน้านโยบาย/เงื่อนไขเปิดได้โดยไม่ login เพราะ Google ลิงก์มาที่หน้าเหล่านี้)
+  const isPublic = PUBLIC_PATHS.some((p) => path.startsWith(p));
   const [authed, setAuthed] = useState(false);
   useEffect(() => {
     setAuthed(!!getToken());
-    if (!path.startsWith("/login") && !getToken()) router.replace("/login");
-  }, [path, router]);
+    if (!isPublic && !getToken()) router.replace("/login");
+  }, [path, router, isPublic]);
 
-  if (path.startsWith("/login")) return <>{children}</>;
+  if (isPublic) return <>{children}</>;
   if (!authed || !ready)
     return (
       <div style={{ display: "grid", placeItems: "center", minHeight: "100vh" }}>

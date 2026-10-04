@@ -68,6 +68,10 @@ class Credentials(BaseModel):
     password: str = Field(min_length=6)
 
 
+class GoogleIn(BaseModel):
+    credential: str  # ID token จากปุ่ม Sign in with Google
+
+
 class ProfileIn(BaseModel):
     display_name: Optional[str] = None
 
@@ -200,9 +204,33 @@ def login(body: LoginIn, request: Request):
         raise ApiError("UNAUTHORIZED", "อีเมลหรือรหัสผ่านไม่ถูกต้อง")
     if auth.needs_rehash(user["password_hash"]):
         db.set_password_hash(user["user_id"], auth.hash_password(body.password))
+    return ok(session(user))
+
+
+def session(user: dict) -> dict:
     # เลือก field เอง ห้ามส่ง password_hash ออกไป
-    return ok({"token": auth.make_token(user["user_id"]),
-               "user": {"user_id": user["user_id"], "email": user["email"], "display_name": user["display_name"]}})
+    return {"token": auth.make_token(user["user_id"]),
+            "user": {"user_id": user["user_id"], "email": user["email"], "display_name": user["display_name"]}}
+
+
+@app.get("/api/v1/auth/config")
+def auth_config():
+    """หน้า login ถามว่าเปิด login ด้วย Google ไหม (client id ไม่ใช่ความลับ อ่านตอนรัน ไม่ต้อง build เว็บใหม่)"""
+    return ok({"google_client_id": auth.google_client_id() or None})
+
+
+@app.post("/api/v1/auth/google")
+def login_google(body: GoogleIn, request: Request):
+    rate_limit(f"login:{client_ip(request)}", *LOGIN_LIMIT)
+    info = auth.read_google_token(body.credential)
+    email = normalize_email(info["email"])
+    # อีเมลเดียวกับบัญชีที่สมัครด้วยรหัสผ่าน = บัญชีเดิม (Google ยืนยันอีเมลแล้ว) รหัสผ่านเดิมยังใช้ได้
+    user = db.find_user_by_email(email)
+    if user is None:
+        user = db.create_user(email, auth.unusable_password_hash()) or db.find_user_by_email(email)
+        if info["name"] and not user["display_name"]:
+            user = db.set_display_name(user["user_id"], info["name"][:DISPLAY_NAME_MAX])
+    return ok(session(user))
 
 
 @app.get("/api/v1/me")

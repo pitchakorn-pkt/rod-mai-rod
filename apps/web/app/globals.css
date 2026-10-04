@@ -2384,6 +2384,14 @@ html:not([data-theme="glass"]) .sos-card .ph.big .ph-num { color: #ffffff; }
 .lc-submit:hover:not(:disabled) svg { transform: translateX(4px); }
 .lc-submit::after { content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.55), transparent); transform: skewX(-20deg); transition: left 0.7s ease; }
 .lc-submit:hover:not(:disabled)::after { left: 130%; }
+/* login ด้วย Google: เส้นคั่น "หรือ" + ปุ่มของ Google (สีปุ่มเลือกตามธีมตอนวาด) */
+.lc-google { display: grid; gap: 12px; margin-bottom: 16px; }
+.lc-or { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: calc(12px * var(--fs)); }
+.lc-or::before, .lc-or::after { content: ""; flex: 1; height: 1px; background: var(--glass-border-subtle); }
+.lc-gbtn { display: flex; justify-content: center; min-height: 44px; }
+.lc-gbtn[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
+.lc-legal { margin: 0; text-align: center; color: var(--muted); font-size: calc(11.5px * var(--fs)); }
+.lc-legal a { color: inherit; text-decoration: underline; }
 .lc-foot { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; padding-top: 16px; border-top: 1px solid var(--glass-border-subtle); }
 .lc-foot span { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 99px; background: rgba(255, 255, 255, 0.04); font-size: calc(11.5px * var(--fs)); color: var(--muted); }
 .lc-foot svg { color: var(--lime); }
@@ -2398,6 +2406,8 @@ html[data-theme="glass"] .lc-submit { background: linear-gradient(100deg, #05966
 .lc-field input::-ms-reveal, .lc-field input::-ms-clear { display: none; }
 /* จอสูงไม่ถึง 960 เก็บรายการจุดเด่นใต้การ์ด ให้การ์ดพอดีจอ (จุดเด่นมีในหัวข้อและตัวอย่างอยู่แล้ว) */
 @media (min-width: 901px) and (max-height: 960px) { .deck-login .auth-points { display: none; } }
+/* มีปุ่ม Google การ์ดสูงขึ้น จอเตี้ยเก็บป้ายเล็กท้ายการ์ด (ข้อมูลซ้ำกับหัวข้อ) ให้การ์ดยังพอดีจอ */
+@media (min-width: 901px) and (max-height: 960px) { .lc-in:has(.lc-google) .lc-foot { display: none; } }
 @media (prefers-reduced-motion: reduce) { .lc, .lc-avatar::before { animation: none; } }
 
 .auth-points { display: grid; gap: 8px; }
@@ -3123,3 +3133,14 @@ html[data-theme="glass"] .sos-ghost:hover { background: rgba(0, 0, 0, 0.3); }
   .cheer.corner .cheer-bubble { display: none; }
   .hero2.has-plan .hero2-tag { max-width: calc(100% - 120px); }
 }
+
+/* หน้านโยบายความเป็นส่วนตัว / เงื่อนไขการใช้งาน (ไม่ต้อง login) */
+.legal { min-height: 100vh; padding: 32px 16px 48px; display: grid; justify-items: center; align-content: start; gap: 20px; }
+.legal-back { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; color: var(--ink); text-decoration: none; }
+.legal-back img { width: 40px; height: 40px; border-radius: 50%; }
+.legal-card { width: min(760px, 100%); padding: 28px clamp(18px, 4vw, 36px); border-radius: 24px; background: var(--surface-card); border: 1px solid var(--glass-border-subtle); line-height: 1.7; backdrop-filter: var(--glass-blur); }
+.legal-card h1 { margin: 0; font-size: calc(26px * var(--fs)); }
+.legal-card h2 { margin: 24px 0 8px; font-size: calc(17px * var(--fs)); }
+.legal-card ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.legal-card a { color: var(--lime); }
+.legal-updated { margin: 4px 0 16px; color: var(--muted); font-size: calc(13px * var(--fs)); }
