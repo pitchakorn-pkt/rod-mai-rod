@@ -205,19 +205,32 @@ DATABASE_URL=postgresql://rodmairod:changeme@localhost:5433/rmr_test pytest -q
 
 ## 8. ทีมและโมดูล
 
-| # | โมดูล | ไฟล์หลัก | ผู้รับผิดชอบ |
-|---|---|---|---|
-| 1 | หน้าเว็บ: โครงเว็บ หน้าหลัก login ของกลาง | `apps/web/app/page.tsx`, `app/login/`, `components/`, `lib/` | Patcharanat Budploy (@Patcharanat23) |
-| 2 | หน้าเว็บ: ทริปของฉัน | `apps/web/app/trips/`, `components/PlanTrip.tsx`, `components/trip.tsx` | Jirapa Gongmool (@jirapa-gm) |
-| 3 | หน้าเว็บ: แผนที่ความเสี่ยง + หน้าแชท | `apps/web/app/map/`, `apps/web/app/assistant/` | Suphakorn Nonthong (@SoSick41) |
-| 4 | API Gateway + Auth + ฐานข้อมูล | `services/api-backend/` | Karmolputh Phatarathorn (@Chakamon02) |
-| 5 | Routing Engine | `services/routing-engine/` | Pitchakorn Phuadkhunthod (@pitchakorn-pkt) |
-| 6 | Weather & Disaster | `services/weather-disaster/` | Pathumporn Jorrapong (@pathumpornjorrapong-ops) |
-| 7 | Risk & Decision | `services/risk-decision/` | Jakkrich Sriraksa (@jakkrich0912-web) |
-| 8 | Assistant Agent | `services/assistant-agent/` | Patcharanat Budploy (@Patcharanat23) |
-| 9 | Safety Knowledge + หน้าฉุกเฉิน | `services/safety-knowledge/`, `apps/web/app/emergency/` | Phitphibul Phrompheak (@phitphibul67) |
+### 8.1 สมาชิกและงานของแต่ละคน (แบ่งตั้งแต่เริ่มโปรเจกต์)
 
-repo อยู่ที่ `pitchakorn-pkt/rod-mai-rod` (ย้ายมาเมื่อ 3 ต.ค. 2569) code owner คือ @Patcharanat23 และ @pitchakorn-pkt
+| # | โมดูล | โฟลเดอร์ | พอร์ตบนเครื่อง | ผู้รับผิดชอบ |
+|---|---|---|---|---|
+| 1 | Frontend: โครงเว็บ + Login + Overview | `apps/web/app/overview/` | 3000 | Patcharanat Budploy (@Patcharanat23) |
+| 2 | Frontend: My Trip | `apps/web/app/my-trip/` | 3000 | Jirapa Gongmool (@jirapa-gm) |
+| 3 | Frontend: Safety Map + หน้าแชท | `apps/web/app/safety-map/`, `apps/web/app/assistant/` | 3000 | Suphakorn Nonthong (@SoSick41) |
+| 4 | API Gateway + Auth + ฐานข้อมูล | `services/api-backend/` | 8001 | Karmolputh Phatarathorn (@Chakamon02) |
+| 5 | Routing Engine | `services/routing-engine/` | 8002 | Pitchakorn Phuadkhunthod (@pitchakorn-pkt) |
+| 6 | Weather & Disaster | `services/weather-disaster/` | 8003 | Pathumporn Jorrapong (@pathumpornjorrapong-ops) |
+| 7 | Risk & Decision | `services/risk-decision/` | 8004 | Jakkrich Sriraksa (@jakkrich0912-web) |
+| 8 | Assistant Agent | `services/assistant-agent/` | 8005 | Patcharanat Budploy (@Patcharanat23) |
+| 9 | Safety Knowledge (คำแนะนำความปลอดภัย + ฉุกเฉิน) | `services/safety-knowledge/` | 8006 | Phitphibul Phrompheak (@phitphibul67) |
+
+โฟลเดอร์ในตารางเป็นตามแผนตอนแรก หลังเปลี่ยนดีไซน์ (PR #77, #82, #83, #84) หน้าเว็บย้ายไปอยู่ที่ `app/page.tsx` (หน้าหลัก), `app/trips/` (ทริปของฉัน), `app/map/` (แผนที่ความเสี่ยง), `app/assistant/` (แชท) และ `app/emergency/` (ฉุกเฉิน ของโมดูล 9) รายละเอียดว่าใครดูแลไฟล์ไหนอยู่ใน [`apps/web/README.md`](apps/web/README.md)
+
+### 8.2 การดูแลโปรเจกต์ต่อ (ตั้งแต่ 3 ต.ค. 2569)
+
+หลังรวมงานทุกโมดูลขึ้น `main` (PR #86) repo ย้ายจากบัญชีของ Patcharanat (@Patcharanat23) มาอยู่ที่ `pitchakorn-pkt/rod-mai-rod` และ **Pitchakorn (@pitchakorn-pkt) เจ้าของโมดูล 5 รับช่วงดูแลโปรเจกต์ต่อ** งานของแต่ละคนในตาราง 8.1 ยังเป็นของคนนั้นตามเดิม ส่วนที่ทำเพิ่มในช่วงนี้:
+
+- แก้ปัญหาที่ทีม อาจารย์ และผู้ทดลองใช้เจอหลัง deploy รอบแรก (#89, #91)
+- เพิ่มข้อมูลถนนปิดจากกรมทางหลวง ฐานความรู้ความปลอดภัย และการตอบของแชท (#89)
+- เพิ่มการเข้าสู่ระบบด้วย Google และหน้า `/privacy` `/terms` (#92)
+- ดูแลการ deploy และอัปเดตเอกสาร (#90, #93, #94, #95)
+
+รายละเอียดอยู่ในหัวข้อ 10 · code owner ใน `.github/CODEOWNERS` คือ @Patcharanat23 และ @pitchakorn-pkt
 
 ---
 
