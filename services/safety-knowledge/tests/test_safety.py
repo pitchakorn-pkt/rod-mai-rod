@@ -17,7 +17,8 @@ def test_search_filters_by_hazard_type():
     res = client.post("/api/v1/safety/search", json={"query": "น้ำ", "hazard_types": ["FLOOD"]}).json()
     assert res["error"] is None
     assert res["data"]["results"]
-    assert all(r["doc_id"] == "flood" for r in res["data"]["results"])
+    flood_docs = {d["doc_id"] for d in load_docs() if "FLOOD" in d["hazard_types"]}
+    assert all(r["doc_id"] in flood_docs for r in res["data"]["results"])
 
 
 def test_empty_query_is_validation_error():
@@ -77,3 +78,30 @@ def test_unrelated_query_returns_empty_results():
     assert res.status_code == 200
     results = res.json()["data"]["results"]
     assert results == []
+
+
+@pytest.mark.parametrize(
+    "query, expected_doc_id",
+    [
+        ("ไฟฟ้าดูดตอนน้ำท่วมต้องระวังอะไร", "flood_electric"),
+        ("ต้องอพยพหนีน้ำท่วมเตรียมอะไรบ้าง", "flood_prepare"),
+        ("ถนนปิดเพราะน้ำท่วมเช็คได้ที่ไหน", "road_status"),
+    ],
+)
+def test_new_documents_are_found(query, expected_doc_id):
+    results = client.post("/api/v1/safety/search", json={"query": query}).json()["data"]["results"]
+    assert results and results[0]["doc_id"] == expected_doc_id
+
+
+def test_few_matching_lines_are_filled_from_the_best_document():
+    results = client.post("/api/v1/safety/search", json={"query": "รถดับกลางน้ำท่วมต้องทำยังไง"}).json()["data"]["results"]
+    assert len(results) == 4
+    assert "ถ้ารถดับกลางน้ำท่วม" in results[0]["snippet_th"]
+    assert sum(r["doc_id"] == "flood" for r in results) >= 3  # ส่วนใหญ่มาจากเอกสารที่ตรงที่สุด
+    assert len({(r["doc_id"], r["snippet_th"]) for r in results}) == 4  # ไม่ซ้ำ
+
+
+def test_limit_is_respected_when_filling():
+    results = client.post("/api/v1/safety/search", json={"query": "รถดับกลางน้ำท่วม", "limit": 2}).json()["data"]["results"]
+    assert len(results) == 2
+
