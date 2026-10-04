@@ -4,8 +4,16 @@
 **ผู้รับผิดชอบ**: Pitchakorn Phuadkhunthod (@pitchakorn-pkt)
 **branch**: `feature/routing-engine/<ชื่อ>`
 **endpoint**: `POST /api/v1/routes/plan` (`docs/CONTRACT.md` หัวข้อ 6)
-**เรียกใคร**: routing API ภายนอก (OSRM เป็นหลัก, openrouteservice / Longdo สำรอง), risk-decision
+**เรียกใคร**: OSRM (ตัวเดียวที่ต่อจริง openrouteservice / Longdo เตรียมชื่อตัวแปรไว้แต่ยังไม่ได้ต่อ), risk-decision
 **ใครเรียกเรา**: api-backend
+
+## ทำอะไรได้แล้วตอนนี้
+
+- ขอเส้นทางจาก OSRM พร้อมเส้นทางเลือก (`alternatives=3`) แบบ polyline รอไม่เกิน 12 วิ ถ้าช้ากว่านั้นโหลดต่อเบื้องหลังแล้วเก็บ cache ไว้ให้ครั้งหน้า
+- เส้นหลักเสี่ยงสูงแต่ OSRM ไม่มีทางเลือก ลองหาเส้นเลี่ยงเอง โดยดันจุดผ่านออกข้างเส้นเดิม 50 กม. (`DETOUR_OFFSET_KM`) ถ้าเวลาพอ
+- จุดตัวอย่างทุก 20 กม. + ทุกจุดแวะ พร้อมเวลาถึงสะสม ส่ง risk-decision ทุกเส้นในคำขอเดียว **พร้อม geometry ของเส้นทาง** ให้เช็กถนนน้ำท่วมที่เส้นทางผ่านจริง
+- ย่อ geometry ไม่เกิน 500 จุด · cache ตามต้นทาง/ปลายทาง/จุดแวะ · `DEMO_MODE` อ่าน `fixtures/` (รับจุดห่างไม่เกิน 15 กม.)
+- เวลารวมต่อคำขอไม่เกิน 42 วิ (api-backend รอ 45 วิ) · เทสต์ 55 ข้อ
 
 ## รันเดี่ยว
 
@@ -25,10 +33,9 @@ curl -s "https://router.project-osrm.org/route/v1/driving/100.5018,13.7563;98.98
   -o "fixtures/13.756_100.502__18.788_98.985.json"
 ```
 
-## เริ่มจากตรงไหน
+## โค้ดทำตามลำดับนี้ (ทำครบแล้ว)
 
-ส่วนที่คุยกับ risk-decision และประกอบ `TripPlan` (`risk_points`, `build_plan`) เขียนไว้แล้ว มีเทสต์ใน `tests/`
-งานหลักคือแก้ `fetch_routes()` ให้คืนเส้นทางจริงในรูปแบบเดิม ทำตามลำดับนี้:
+ส่วนที่คุยกับ risk-decision และประกอบ `TripPlan` อยู่ใน `risk_points`, `build_plan` ส่วนดึงเส้นทางอยู่ใน `fetch_routes()` มีเทสต์ใน `tests/`
 
 1. เรียก OSRM (ไม่ต้องใช้ key ลองแล้วว่ากรุงเทพ-เชียงใหม่ได้ 2 เส้น)
    `GET {OSRM_BASE_URL}/route/v1/driving/{lng},{lat};{lng},{lat};...?alternatives=3&overview=full&geometries=polyline`
