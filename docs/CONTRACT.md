@@ -205,7 +205,7 @@ frontend ต้องแสดงแถบแจ้งเตือนตาม w
 | GET | `/api/v1/maps/flood/{window}/{z}/{x}/{y}` | ภาพชั้นน้ำท่วม GISTDA (PNG) `window` = `1day` `3days` `7days` `30days` ส่งต่อพร้อม key ฝั่ง server **key ห้ามถึงหน้าเว็บ** |
 | GET | `/api/v1/weather/area?lat=&lng=` | สภาพอากาศแบบพื้นที่รอบจุด (ใช้ตอนยังไม่มีทริป) |
 | GET | `/api/v1/hazards?min_lat=&min_lng=&max_lat=&max_lng=` | หมุดภัยในกรอบแผนที่ (Safety Map) กรอบกลับด้าน (min > max) ได้ `VALIDATION_ERROR` |
-| POST | `/api/v1/assistant/chat` | `{message, history[]}` ได้ `ChatReply` |
+| POST | `/api/v1/assistant/chat` | `{message, history[], location?}` ได้ `ChatReply` (`location` = `{lat, lng}` จาก GPS ของผู้ใช้ ส่งเมื่อได้ตำแหน่งจริง ใช้เป็นต้นทางตอนแชทสร้างทริป) |
 | GET | `/api/v1/safety/emergency?hazard_type=` | คำแนะนำฉุกเฉินของภัยชนิดนั้น ได้ `Emergency` (แสดงเมื่อเส้นทางหรือหมุดภัยเป็น HIGH) |
 | GET | `/api/v1/places/search?q=` | ค้นสถานที่ในไทยจากชื่อที่พิมพ์ (ช่องปักหมุดในฟอร์มทริป) ได้ `{"places": [Place...]}` ไม่เกิน 5 ตัว (รูปแบบด้านล่าง) |
 | GET | `/api/v1/places/nearby?lat=&lng=[&radius_km=&kinds=]` | สถานที่เที่ยวใกล้ตำแหน่ง ได้ `{"places": [NearbyPlace...]}` เรียงจากใกล้ไปไกล ไม่ส่ง `radius_km`/`kinds` = 5 กม. ไม่เกิน 8 ตัว (แบบเดิม) ส่ง = รัศมี 1-20 กม. ไม่เกิน 20 ตัว เลือกกระจายตั้งแต่วงใกล้ถึงวงไกล (หน้าหลักใช้ 20 กม. แชทใช้ตามแนวที่ผู้ใช้ขอ) |
@@ -234,7 +234,7 @@ frontend ต้องแสดงแถบแจ้งเตือนตาม w
 
 | Method | Path | ใช้ทำอะไร |
 |---|---|---|
-| POST | `/api/v1/chat` | `{message, history[], user_name}` + header `Authorization` ของผู้ใช้ ได้ `ChatReply` (`user_name` = ชื่อในโปรไฟล์ api-backend ใส่ให้ อาจเป็น `null`) |
+| POST | `/api/v1/chat` | `{message, history[], user_name, location}` + header `Authorization` ของผู้ใช้ ได้ `ChatReply` (`user_name` = ชื่อในโปรไฟล์ api-backend ใส่ให้ อาจเป็น `null` · `location` ส่งต่อจากหน้าเว็บ อาจเป็น `null`) |
 
 ### safety-knowledge
 

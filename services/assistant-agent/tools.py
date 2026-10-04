@@ -87,7 +87,7 @@ SCHEMAS = [
         "name": "create_trip",
         "description": "สร้างทริปใหม่แล้ววางแผนเส้นทางให้ทันที ต้องรู้ต้นทาง ปลายทาง วันและเวลาออก ขาดข้อไหนให้ถามก่อน",
         "parameters": {"type": "object", "properties": {
-            "origin": {"type": "string", "description": "ชื่อต้นทาง เช่น กรุงเทพ"},
+            "origin": {"type": "string", "description": "ชื่อต้นทาง เช่น กรุงเทพ หรือ ตำแหน่งปัจจุบัน (ใช้ GPS ของผู้ใช้)"},
             "destination": {"type": "string", "description": "ชื่อปลายทาง"},
             "date": {"type": "string", "description": "วันออกตามเวลาไทย YYYY-MM-DD"},
             "time": {"type": "string", "description": "เวลาออกตามเวลาไทย HH:MM"},
@@ -225,8 +225,33 @@ def get_trip_weather(args: dict, backend: Backend, auth: str) -> tuple[dict, lis
     }, []
 
 
+# คำที่หมายถึงตำแหน่ง GPS ของผู้ใช้ run() แทนเป็นพิกัดจริงก่อนถึง resolve_place
+HERE_WORDS = {"ตำแหน่งปัจจุบัน", "ตำแหน่งของฉัน", "ตำแหน่งฉัน", "ที่นี่", "ตรงนี้", "current location", "my location", "here"}
+HERE_NAME = "ตำแหน่งปัจจุบัน"
+
+
+def is_here(value) -> bool:
+    return isinstance(value, str) and value.strip().lower() in HERE_WORDS
+
+
+def with_here(args: dict, here: Optional[dict]) -> dict:
+    """แทน "ตำแหน่งปัจจุบัน" ในต้นทาง ปลายทาง จุดแวะ ด้วยพิกัด GPS ที่หน้าเว็บส่งมา"""
+    if not here:
+        return args
+    spot = {"lat": here["lat"], "lng": here["lng"], "name": HERE_NAME}
+    out = {k: (spot if k in ("origin", "destination") and is_here(v) else v) for k, v in args.items()}
+    if isinstance(out.get("stops"), list):
+        out["stops"] = [spot if is_here(n) else n for n in out["stops"]]
+    return out
+
+
 def resolve_place(query, backend: Backend, auth: str) -> tuple[Optional[dict], Optional[str]]:
-    """ชื่อที่ผู้ใช้พิมพ์ > ผลแรกของ /places/search คืน (สถานที่, None) หรือ (None, เหตุผลให้ถามผู้ใช้)"""
+    """ชื่อที่ผู้ใช้พิมพ์ > ผลแรกของ /places/search คืน (สถานที่, None) หรือ (None, เหตุผลให้ถามผู้ใช้)
+    query เป็นพิกัดอยู่แล้ว (ตำแหน่งปัจจุบันจาก with_here) ใช้ได้เลย"""
+    if isinstance(query, dict):
+        return query, None
+    if is_here(query):
+        return None, "ยังไม่รู้ตำแหน่งปัจจุบันของผู้ใช้ (เบราว์เซอร์ไม่ได้ส่งมา) ให้ถามต้นทางเป็นชื่อสถานที่"
     q = str(query or "").strip()
     found = backend("GET", "/api/v1/places/search", auth, params={"q": q})["places"] if len(q) >= 2 else []
     if not found:
@@ -431,15 +456,16 @@ HANDLERS = {"list_trips": list_trips, "update_trip_time": update_trip_time,
             "nearby_places": nearby_places, "place_conditions": place_conditions, "hazards_now": hazards_now, "emergency_info": emergency_info, "create_trip": create_trip, "update_trip_places": update_trip_places}
 
 
-def run(name: str, args: dict, backend: Backend, auth: str) -> tuple[dict, list]:
-    """คืน (ผลที่ส่งกลับให้ LLM, actions) actions มีเฉพาะเมื่อ api-backend ตอบสำเร็จแล้ว"""
+def run(name: str, args: dict, backend: Backend, auth: str, here: Optional[dict] = None) -> tuple[dict, list]:
+    """คืน (ผลที่ส่งกลับให้ LLM, actions) actions มีเฉพาะเมื่อ api-backend ตอบสำเร็จแล้ว
+    here = ตำแหน่ง GPS ของผู้ใช้ (ถ้ามี) ใช้แทนคำว่า "ตำแหน่งปัจจุบัน" """
     handler = HANDLERS.get(name)
     if handler is None:
         return {"error": f"ไม่มี tool ชื่อ {name}"}, []
     if not isinstance(args, dict):
         return {"error": "arguments ต้องเป็น object"}, []
     try:
-        return handler(args, backend, auth)
+        return handler(with_here(args, here), backend, auth)
     except ApiError as e:
         return {"error": e.message, "code": e.code}, []
     except (TypeError, ValueError):

@@ -248,3 +248,33 @@ def test_emergency_info_gives_only_system_numbers():
     assert out["steps_th"] == ["ห้ามขับผ่านน้ำสูง"]
     run("emergency_info", {"hazard_type": "ZOMBIE"}, be)  # ชนิดแปลกไม่ส่งต่อ ใช้แค่เบอร์
     assert be.calls[-1][2] == {"hazard_type": "FLOOD"}
+
+
+# ---------- ต้นทาง = ตำแหน่งปัจจุบันจาก GPS ----------
+
+HERE = {"lat": 14.0357, "lng": 100.727}
+
+
+def test_create_trip_from_current_location_uses_gps_without_search():
+    be = PlacesBackend([])
+    out, acts = tools.run("create_trip", {"origin": "ตำแหน่งปัจจุบัน", "destination": "เชียงใหม่",
+                                          "date": "2099-01-05", "time": "13:00"}, be, AUTH, HERE)
+    created = next(c[2] for c in be.calls if c[:2] == ("POST", "/api/v1/trips"))
+    assert created["origin"] == {**HERE, "name": "ตำแหน่งปัจจุบัน"} and created["destination"] == CNX
+    assert not any(c[1] == "/api/v1/places/search" and c[2]["q"] == "ตำแหน่งปัจจุบัน" for c in be.calls)
+    assert acts and acts[0]["type"] == "TRIP_CREATED"
+
+
+def test_return_trip_can_end_at_current_location():
+    be = PlacesBackend([])
+    tools.run("create_trip", {"origin": "เชียงใหม่", "destination": "current location",
+                              "date": "2099-01-07", "time": "13:00"}, be, AUTH, HERE)
+    created = next(c[2] for c in be.calls if c[:2] == ("POST", "/api/v1/trips"))
+    assert created["destination"]["lat"] == HERE["lat"]
+
+
+def test_current_location_unknown_asks_for_origin():
+    be = PlacesBackend([])
+    out, acts = tools.run("create_trip", {"origin": "ตำแหน่งปัจจุบัน", "destination": "เชียงใหม่",
+                                          "date": "2099-01-05", "time": "13:00"}, be, AUTH)
+    assert "ยังไม่รู้ตำแหน่งปัจจุบัน" in out["error"] and acts == []

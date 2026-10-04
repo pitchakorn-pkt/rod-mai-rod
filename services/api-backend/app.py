@@ -106,6 +106,7 @@ class TripPatch(BaseModel):
 class ChatIn(BaseModel):
     message: str
     history: list[dict] = []
+    location: Optional[Place] = None  # ตำแหน่ง GPS ของผู้ใช้ ใช้เป็นต้นทางตอนสร้างทริป
 
 
 def current_user(authorization: Optional[str]) -> dict:

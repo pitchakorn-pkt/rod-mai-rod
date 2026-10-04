@@ -12,6 +12,7 @@ import llm
 import rules
 import tools
 from envelope import ApiError, call, ok, setup
+from geo import in_thailand
 
 app = FastAPI(title="assistant-agent")
 setup(app, "assistant-agent")
@@ -25,6 +26,7 @@ class ChatIn(BaseModel):
     message: str
     history: list[dict] = []
     user_name: Optional[str] = None  # ชื่อที่ผู้ใช้ตั้งในโปรไฟล์ (api-backend ส่งมา)
+    location: Optional[dict] = None  # ตำแหน่ง GPS ของผู้ใช้ {lat, lng} หน้าเว็บส่งมาเมื่อได้ตำแหน่งจริง
 
 
 def backend(method: str, path: str, authorization: str, json=None, params=None):
@@ -46,6 +48,22 @@ def name_context(name: Optional[str]) -> str:
     if not name:
         return ""
     return f"ผู้ใช้ชื่อ {name} เรียกผู้ใช้ว่า คุณ{name} ได้ ถ้าผู้ใช้ถามว่าตัวเองชื่ออะไรให้ตอบชื่อนี้\n"
+
+
+def user_location(loc: Optional[dict]) -> Optional[dict]:
+    """ใช้เฉพาะพิกัดที่อยู่ในไทย (เส้นทางและพยากรณ์ของระบบครอบคลุมแค่ในไทย)"""
+    try:
+        lat, lng = float(loc["lat"]), float(loc["lng"])
+    except (TypeError, KeyError, ValueError):
+        return None
+    return {"lat": lat, "lng": lng} if in_thailand(lat, lng) else None
+
+
+def location_context(here: Optional[dict]) -> str:
+    if here:
+        return (f"ตำแหน่งปัจจุบันของผู้ใช้จาก GPS: {here['lat']:.4f}, {here['lng']:.4f} "
+                "ผู้ใช้ไม่บอกต้นทาง ให้ใช้ต้นทาง \"ตำแหน่งปัจจุบัน\" ได้เลย ไม่ต้องถามต้นทาง\n")
+    return "ไม่รู้ตำแหน่งปัจจุบันของผู้ใช้ ถ้าผู้ใช้ไม่บอกต้นทางให้ถาม ห้ามเดาต้นทางเอง\n"
 
 
 # เอกสารความปลอดภัยเป็นภาษาไทย ตัวค้นเทียบตัวอักษร คำถามภาษาอังกฤษจึงค้นไม่เจอ แปลงคำสำคัญเป็นคำค้นไทยก่อน
@@ -100,6 +118,7 @@ def chat(body: ChatIn, authorization: Optional[str] = Header(None)):
     reply = rules.try_rules(message, authorization, backend)
     if reply is not None:
         return ok(reply)
+    here = user_location(body.location)
     return ok(llm.answer(message, body.history, safety_search(message),
-                         lambda name, args: tools.run(name, args, backend, authorization),
-                         context=name_context(body.user_name) + trips_context(authorization)))
+                         lambda name, args: tools.run(name, args, backend, authorization, here),
+                         context=name_context(body.user_name) + location_context(here) + trips_context(authorization)))
