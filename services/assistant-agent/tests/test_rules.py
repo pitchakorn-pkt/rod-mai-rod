@@ -168,3 +168,14 @@ def test_specific_day_or_time_goes_to_llm_not_a_wrong_rule(text):
 def test_trip_number_written_the_thai_way(text, kind, trip_no):
     cmd = rules.parse(text)
     assert cmd["kind"] == kind and cmd["trip_no"] == trip_no
+
+
+@pytest.mark.parametrize("text", [
+    "ถ้าเลื่อน Trip 01 ไปออกบ่ายแล้วจะเสี่ยงน้อยลงไหม",
+    "หากเลื่อนทริปไปวันถัดไปจะดีกว่าไหม",
+    "เลื่อน Trip 01 เป็นช่วงเย็นดีมั้ย",
+    "เลื่อนทริปไปพรุ่งนี้ได้หรือเปล่า?",
+])
+def test_what_if_questions_never_move_a_trip(text):
+    # ถามแบบสมมติ ไม่ใช่คำสั่ง กฎต้องไม่เลื่อนทริปจริง (ให้ LLM ตอบ)
+    assert rules.parse(text) is None

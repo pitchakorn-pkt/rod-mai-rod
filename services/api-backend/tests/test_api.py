@@ -252,3 +252,14 @@ def test_chat_sends_display_name_to_the_agent(client, monkeypatch):
     client.patch("/api/v1/me", headers=h, json={"display_name": "แพนด้า"})
     client.post("/api/v1/assistant/chat", headers=h, json={"message": "ฉันชื่ออะไร"})
     assert sent["json"]["user_name"] == "แพนด้า"
+
+
+def test_chat_passes_gps_location_to_the_agent(client, monkeypatch):
+    import app as appmod
+    sent = {}
+    monkeypatch.setattr(appmod, "call", lambda *a, **k: sent.update(k) or {"reply": "ok", "actions": []})
+    _, h = new_user(client)
+    client.post("/api/v1/assistant/chat", headers=h, json={"message": "ไปเชียงใหม่", "location": {"lat": 14.03, "lng": 100.72}})
+    assert sent["json"]["location"] == {"lat": 14.03, "lng": 100.72, "name": None}
+    client.post("/api/v1/assistant/chat", headers=h, json={"message": "ไปเชียงใหม่"})
+    assert sent["json"]["location"] is None

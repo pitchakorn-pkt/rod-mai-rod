@@ -1726,6 +1726,8 @@ html[data-map="dark"] .map, html[data-map="dark"] .map .leaflet-container { back
 }
 .ph.big:hover { background: rgba(255, 255, 255, 0.14); }
 .ph.big .ph-num { font-size: calc(28px * var(--fs)); min-width: 80px; }
+/* ธีมมืด: เบอร์บนการ์ดสีแดงเดิมเป็นแดงอ่อนบนพื้นแดง (คอนทราสต์ 1.6) แทบมองไม่เห็น (ธีมขาวการ์ดสีอ่อน ใช้สีเดิม) */
+html:not([data-theme="glass"]) .sos-card .ph.big .ph-num { color: #ffffff; }
 .ph.big .ph-act { width: 40px; height: 40px; border-radius: 50%; background: var(--high); color: #fff; }
 
 .phonebook .dash-scroll { display: grid; gap: 10px; align-content: start; }
@@ -2446,7 +2448,8 @@ html[data-theme="glass"] .lc-submit { background: linear-gradient(100deg, #05966
 
 @media (prefers-reduced-motion: reduce) { .deck-panel, .deck-body { transition: none; } .deck-hint { animation: none; } }
 
-@media (min-width: 901px) and (max-height: 820px) {
+/* จอเตี้ย (รวมหน้าต่าง Safari บนจอ 900) ย่อหัวข้อและการ์ด ให้การ์ด login ที่มีปุ่ม Google ไม่ล้นขอบล่าง */
+@media (min-width: 901px) and (max-height: 920px) {
   .lp-main.deck { gap: 6px; }
   .deck .lp-head { gap: 6px; }
   .deck .lp-head p { display: none; }
@@ -2468,7 +2471,7 @@ html[data-page="login"]:not([data-theme="glass"]) body {
 html[data-theme="glass"] :is(.lp-sources span, .auth-point, .sc-tabs button) { background: rgba(255, 255, 255, 0.7); }
 html[data-theme="glass"] .sc-window { border-color: rgba(15, 23, 42, 0.12); box-shadow: 0 40px 80px rgba(15, 23, 42, 0.25); }
 
-@media (min-width: 901px) and (max-height: 820px) {
+@media (min-width: 901px) and (max-height: 920px) {
   .lp { padding-top: 16px; padding-bottom: 12px; }
   .lp-intro { gap: 16px; }
   .lp-head .hero2-tag { display: none; }
@@ -2820,7 +2823,7 @@ html[data-theme="glass"] {
   --aqua-50: rgba(2, 132, 199, 0.12);
   --aqua-100: rgba(2, 132, 199, 0.24);
 
-  --sun: #d97706;
+  --sun: #b45309; /* เข้มกว่า #d97706 ให้ป้ายส้มบนพื้นครีมคอนทราสต์ผ่าน 4.5 */
   --sun-50: rgba(217, 119, 6, 0.12);
   --sun-100: rgba(217, 119, 6, 0.24);
 
@@ -2851,7 +2854,7 @@ html[data-theme="glass"] {
   --low-50: rgba(5, 150, 105, 0.12);
   --low-glow: 0 0 20px rgba(5, 150, 105, 0.25);
 
-  --mid: #d97706;
+  --mid: #b45309;
   --mid-50: rgba(217, 119, 6, 0.12);
   --mid-glow: 0 0 20px rgba(217, 119, 6, 0.25);
 

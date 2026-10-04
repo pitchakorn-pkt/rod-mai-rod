@@ -87,11 +87,14 @@ SCHEMAS = [
         "name": "create_trip",
         "description": "สร้างทริปใหม่แล้ววางแผนเส้นทางให้ทันที ต้องรู้ต้นทาง ปลายทาง วันและเวลาออก ขาดข้อไหนให้ถามก่อน",
         "parameters": {"type": "object", "properties": {
-            "origin": {"type": "string", "description": "ชื่อต้นทาง เช่น กรุงเทพ"},
+            "origin": {"type": "string", "description": "ชื่อต้นทาง เช่น กรุงเทพ หรือ ตำแหน่งปัจจุบัน (ใช้ GPS ของผู้ใช้)"},
             "destination": {"type": "string", "description": "ชื่อปลายทาง"},
             "date": {"type": "string", "description": "วันออกตามเวลาไทย YYYY-MM-DD"},
             "time": {"type": "string", "description": "เวลาออกตามเวลาไทย HH:MM"},
             "stops": {"type": "array", "items": {"type": "string"}, "description": "จุดแวะตามลำดับ ไม่เกิน 5 จุด"},
+            "return_date": {"type": "string",
+                            "description": "วันกลับตามเวลาไทย YYYY-MM-DD ถ้าผู้ใช้บอก ระบบสร้างทริปขากลับ (สลับต้นทางกับปลายทาง) ให้เอง"},
+            "return_time": {"type": "string", "description": "เวลาออกขากลับ HH:MM ไม่บอกใช้เวลาเดียวกับขาไป"},
         }, "required": ["origin", "destination", "date", "time"]},
     }},
     {"type": "function", "function": {
@@ -225,8 +228,33 @@ def get_trip_weather(args: dict, backend: Backend, auth: str) -> tuple[dict, lis
     }, []
 
 
+# คำที่หมายถึงตำแหน่ง GPS ของผู้ใช้ run() แทนเป็นพิกัดจริงก่อนถึง resolve_place
+HERE_WORDS = {"ตำแหน่งปัจจุบัน", "ตำแหน่งของฉัน", "ตำแหน่งฉัน", "ที่นี่", "ตรงนี้", "current location", "my location", "here"}
+HERE_NAME = "ตำแหน่งปัจจุบัน"
+
+
+def is_here(value) -> bool:
+    return isinstance(value, str) and value.strip().lower() in HERE_WORDS
+
+
+def with_here(args: dict, here: Optional[dict]) -> dict:
+    """แทน "ตำแหน่งปัจจุบัน" ในต้นทาง ปลายทาง จุดแวะ ด้วยพิกัด GPS ที่หน้าเว็บส่งมา"""
+    if not here:
+        return args
+    spot = {"lat": here["lat"], "lng": here["lng"], "name": HERE_NAME}
+    out = {k: (spot if k in ("origin", "destination") and is_here(v) else v) for k, v in args.items()}
+    if isinstance(out.get("stops"), list):
+        out["stops"] = [spot if is_here(n) else n for n in out["stops"]]
+    return out
+
+
 def resolve_place(query, backend: Backend, auth: str) -> tuple[Optional[dict], Optional[str]]:
-    """ชื่อที่ผู้ใช้พิมพ์ > ผลแรกของ /places/search คืน (สถานที่, None) หรือ (None, เหตุผลให้ถามผู้ใช้)"""
+    """ชื่อที่ผู้ใช้พิมพ์ > ผลแรกของ /places/search คืน (สถานที่, None) หรือ (None, เหตุผลให้ถามผู้ใช้)
+    query เป็นพิกัดอยู่แล้ว (ตำแหน่งปัจจุบันจาก with_here) ใช้ได้เลย"""
+    if isinstance(query, dict):
+        return query, None
+    if is_here(query):
+        return None, "ยังไม่รู้ตำแหน่งปัจจุบันของผู้ใช้ (เบราว์เซอร์ไม่ได้ส่งมา) ให้ถามต้นทางเป็นชื่อสถานที่"
     q = str(query or "").strip()
     found = backend("GET", "/api/v1/places/search", auth, params={"q": q})["places"] if len(q) >= 2 else []
     if not found:
@@ -382,14 +410,34 @@ def hazards_now(args: dict, backend: Backend, auth: str) -> tuple[dict, list]:
     return out, []
 
 
-def create_trip(args: dict, backend: Backend, auth: str, now: Optional[datetime] = None) -> tuple[dict, list]:
-    d = YMD.match(str(args.get("date") or "").strip())
-    t = HHMM.match(str(args.get("time") or "").strip())
+def same_trip(trips: list[dict], origin: dict, destination: dict, when: datetime) -> Optional[dict]:
+    """ทริปที่ต้นทาง ปลายทาง (ห่างไม่เกินราว 100 ม.) และเวลาออกตรงกัน = ทริปซ้ำ"""
+    def near(a: dict, b: dict) -> bool:
+        return abs(a["lat"] - b["lat"]) < 0.001 and abs(a["lng"] - b["lng"]) < 0.001
+    return next((t for t in trips if departs(t) == when and near(t["origin"], origin)
+                 and near(t["destination"], destination)), None)
+
+
+def thai_datetime(date, time) -> Optional[datetime]:
+    d = YMD.match(str(date or "").strip())
+    t = HHMM.match(str(time or "").strip())
     if not d or not t:
+        return None
+    return datetime(int(d.group(1)), int(d.group(2)), int(d.group(3)), int(t.group(1)), int(t.group(2)), tzinfo=BANGKOK)
+
+
+def create_trip(args: dict, backend: Backend, auth: str, now: Optional[datetime] = None) -> tuple[dict, list]:
+    when = thai_datetime(args.get("date"), args.get("time"))
+    if when is None:
         return {"error": "ต้องรู้วันและเวลาออก ให้ถามผู้ใช้"}, []
-    when = datetime(int(d.group(1)), int(d.group(2)), int(d.group(3)), int(t.group(1)), int(t.group(2)), tzinfo=BANGKOK)
     if when <= (now or datetime.now(timezone.utc)):
         return {"error": f"เวลาออก {thai_time(to_utc_iso(when))} ผ่านไปแล้ว"}, []
+    # ขากลับ: เช็กก่อนสร้างอะไร ผิดจะได้ไม่เหลือขาไปค้างครึ่งเดียว
+    back_when = None
+    if args.get("return_date"):
+        back_when = thai_datetime(args["return_date"], args.get("return_time") or args.get("time"))
+        if back_when is None or back_when <= when:
+            return {"error": "วันเวลากลับต้องหลังเวลาออกขาไป ให้ถามผู้ใช้อีกครั้ง"}, []
     origin, err = resolve_place(args.get("origin"), backend, auth)
     if err:
         return {"error": err}, []
@@ -399,10 +447,22 @@ def create_trip(args: dict, backend: Backend, auth: str, now: Optional[datetime]
     stops, err = resolve_stops(args.get("stops") or [], backend, auth)
     if err:
         return {"error": err}, []
+    same = same_trip(backend("GET", "/api/v1/trips", auth), origin, destination, when)
+    if same:
+        # ผู้ใช้พิมพ์ "สร้างเลย" ซ้ำหลังสร้างไปแล้ว โมเดลเคยสร้างทริปเดิมซ้ำอีกอัน
+        return {"error": f"มี {label(same['trip_no'])} เส้นทางและเวลาออกนี้อยู่แล้ว ไม่ได้สร้างซ้ำ บอกผู้ใช้ว่าสร้างไว้แล้ว"}, []
     trip = backend("POST", "/api/v1/trips", auth, json={
         "origin": origin, "destination": destination, "departure_time": to_utc_iso(when), "waypoints": stops})
     actions = [{"type": "TRIP_CREATED", "trip_id": trip["trip_id"], "trip_no": trip["trip_no"]}]
-    return saved_and_planned(trip, backend, auth, {"created": True}), actions
+    result = saved_and_planned(trip, backend, auth, {"created": True})
+    if back_when and not same_trip(backend("GET", "/api/v1/trips", auth), destination, origin, back_when):
+        # สลับสถานที่ที่หาไว้แล้วตรงๆ ขากลับจึงจบที่ต้นทางเดิมเป๊ะ (เช่น ตำแหน่งปัจจุบัน) ไม่ให้โมเดลพิมพ์ชื่อเอง
+        back = backend("POST", "/api/v1/trips", auth, json={
+            "origin": destination, "destination": origin, "departure_time": to_utc_iso(back_when),
+            "waypoints": stops[::-1]})
+        actions.append({"type": "TRIP_CREATED", "trip_id": back["trip_id"], "trip_no": back["trip_no"]})
+        result["return_trip"] = saved_and_planned(back, backend, auth, {"created": True})
+    return result, actions
 
 
 def update_trip_places(args: dict, backend: Backend, auth: str) -> tuple[dict, list]:
@@ -431,15 +491,16 @@ HANDLERS = {"list_trips": list_trips, "update_trip_time": update_trip_time,
             "nearby_places": nearby_places, "place_conditions": place_conditions, "hazards_now": hazards_now, "emergency_info": emergency_info, "create_trip": create_trip, "update_trip_places": update_trip_places}
 
 
-def run(name: str, args: dict, backend: Backend, auth: str) -> tuple[dict, list]:
-    """คืน (ผลที่ส่งกลับให้ LLM, actions) actions มีเฉพาะเมื่อ api-backend ตอบสำเร็จแล้ว"""
+def run(name: str, args: dict, backend: Backend, auth: str, here: Optional[dict] = None) -> tuple[dict, list]:
+    """คืน (ผลที่ส่งกลับให้ LLM, actions) actions มีเฉพาะเมื่อ api-backend ตอบสำเร็จแล้ว
+    here = ตำแหน่ง GPS ของผู้ใช้ (ถ้ามี) ใช้แทนคำว่า "ตำแหน่งปัจจุบัน" """
     handler = HANDLERS.get(name)
     if handler is None:
         return {"error": f"ไม่มี tool ชื่อ {name}"}, []
     if not isinstance(args, dict):
         return {"error": "arguments ต้องเป็น object"}, []
     try:
-        return handler(args, backend, auth)
+        return handler(with_here(args, here), backend, auth)
     except ApiError as e:
         return {"error": e.message, "code": e.code}, []
     except (TypeError, ValueError):

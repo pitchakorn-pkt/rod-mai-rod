@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Map from "./Map";
 import Icon from "./Icon";
 import type { LatLng } from "@/lib/data";
@@ -145,18 +145,28 @@ export default function PlanTrip({
   const [locating, setLocating] = useState(false);
   const editing = !!initial;
   const [error, setError] = useState<string | null>(null);
-  // ไปที่เที่ยวรอบตัว: ต้นทาง = ตำแหน่งปัจจุบัน ปลายทาง = ที่ที่เลือก
+  // ทริปใหม่: ต้นทาง = ตำแหน่งปัจจุบันจาก GPS (ผู้ใช้อนุญาตตำแหน่งแล้ว ไม่ต้องกรอกเอง)
   // ยังไม่ได้ตำแหน่งจริง ไม่เติมต้นทางให้ (ไม่งั้นจะได้กรุงเทพโดยผู้ใช้ไม่รู้ตัว)
-  const [origin, setOrigin] = useState<Place | null>(initial?.origin ?? (presetDestination && !hereFallback ? { name: "ตำแหน่งปัจจุบัน", ...here } : null));
+  const current = !initial && !hereFallback ? { name: "ตำแหน่งปัจจุบัน", ...here } : null;
+  const [origin, setOrigin] = useState<Place | null>(initial?.origin ?? current);
   const [dest, setDest] = useState<Place | null>(initial?.destination ?? presetDestination ?? null);
   const [stops, setStops] = useState<Place[]>(initial?.stops ?? []);
-  const [focus, setFocus] = useState<"origin" | "dest" | "stop">(initial || presetDestination ? "stop" : "origin");
+  const [focus, setFocus] = useState<"origin" | "dest" | "stop">(initial || presetDestination ? "stop" : current ? "dest" : "origin");
+  // ตำแหน่งจริงมาถึงหลังเปิดฟอร์ม เติมต้นทางให้ ถ้าผู้ใช้ยังไม่ได้เลือกต้นทางเอง
+  const pickedOrigin = useRef(false);
+  useEffect(() => {
+    if (!current || pickedOrigin.current) return;
+    pickedOrigin.current = true;
+    setOrigin((o) => o ?? current);
+    setFocus((f) => (f === "origin" ? "dest" : f));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hereFallback]);
   const [title, setTitle] = useState(initial?.title ?? "");
   const [date, setDate] = useState(initial ? toThaiInput(initial.departure) : "");
   const [busy, setBusy] = useState(false);
 
   function place(p: Place) {
-    if (focus === "origin") { setOrigin(p); setFocus(dest ? "stop" : "dest"); }
+    if (focus === "origin") { pickedOrigin.current = true; setOrigin(p); setFocus(dest ? "stop" : "dest"); }
     else if (focus === "dest") { setDest(p); setFocus("stop"); }
     else if (stops.length < 5) setStops([...stops, p]);
   }
@@ -212,7 +222,7 @@ export default function PlanTrip({
               {locating ? "กำลังหาตำแหน่ง..." : "ตำแหน่งฉัน"}
             </button>
           </div>
-          <PlaceInput label="ต้นทาง" value={origin} onPick={(p) => { setOrigin(p); setFocus(dest ? "stop" : "dest"); }} onClear={() => { setOrigin(null); setFocus("origin"); }} active={focus === "origin"} onFocus={() => setFocus("origin")} />
+          <PlaceInput label="ต้นทาง" value={origin} onPick={(p) => { pickedOrigin.current = true; setOrigin(p); setFocus(dest ? "stop" : "dest"); }} onClear={() => { pickedOrigin.current = true; setOrigin(null); setFocus("origin"); }} active={focus === "origin"} onFocus={() => setFocus("origin")} />
           {stops.map((s, i) => (
             <div key={i} className="row nowrap input" style={{ padding: "8px 8px 8px 12px" }}>
               <span className="badge" style={{ background: "var(--aqua)" }}>{i + 1}</span>
