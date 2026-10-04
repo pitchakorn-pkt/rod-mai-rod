@@ -248,3 +248,73 @@ def test_emergency_info_gives_only_system_numbers():
     assert out["steps_th"] == ["ห้ามขับผ่านน้ำสูง"]
     run("emergency_info", {"hazard_type": "ZOMBIE"}, be)  # ชนิดแปลกไม่ส่งต่อ ใช้แค่เบอร์
     assert be.calls[-1][2] == {"hazard_type": "FLOOD"}
+
+
+# ---------- ต้นทาง = ตำแหน่งปัจจุบันจาก GPS ----------
+
+HERE = {"lat": 14.0357, "lng": 100.727}
+
+
+def test_create_trip_from_current_location_uses_gps_without_search():
+    be = PlacesBackend([])
+    out, acts = tools.run("create_trip", {"origin": "ตำแหน่งปัจจุบัน", "destination": "เชียงใหม่",
+                                          "date": "2099-01-05", "time": "13:00"}, be, AUTH, HERE)
+    created = next(c[2] for c in be.calls if c[:2] == ("POST", "/api/v1/trips"))
+    assert created["origin"] == {**HERE, "name": "ตำแหน่งปัจจุบัน"} and created["destination"] == CNX
+    assert not any(c[1] == "/api/v1/places/search" and c[2]["q"] == "ตำแหน่งปัจจุบัน" for c in be.calls)
+    assert acts and acts[0]["type"] == "TRIP_CREATED"
+
+
+def test_return_trip_can_end_at_current_location():
+    be = PlacesBackend([])
+    tools.run("create_trip", {"origin": "เชียงใหม่", "destination": "current location",
+                              "date": "2099-01-07", "time": "13:00"}, be, AUTH, HERE)
+    created = next(c[2] for c in be.calls if c[:2] == ("POST", "/api/v1/trips"))
+    assert created["destination"]["lat"] == HERE["lat"]
+
+
+def test_current_location_unknown_asks_for_origin():
+    be = PlacesBackend([])
+    out, acts = tools.run("create_trip", {"origin": "ตำแหน่งปัจจุบัน", "destination": "เชียงใหม่",
+                                          "date": "2099-01-05", "time": "13:00"}, be, AUTH)
+    assert "ยังไม่รู้ตำแหน่งปัจจุบัน" in out["error"] and acts == []
+
+
+def test_same_route_and_time_is_not_created_twice():
+    be = PlacesBackend([])
+    args = {"origin": "ตำแหน่งปัจจุบัน", "destination": "เชียงใหม่", "date": "2099-01-05", "time": "13:00"}
+    _, first = tools.run("create_trip", args, be, AUTH, HERE)
+    out, second = tools.run("create_trip", args, be, AUTH, HERE)
+    assert first and second == [] and "อยู่แล้ว" in out["error"]
+    assert sum(c[:2] == ("POST", "/api/v1/trips") for c in be.calls) == 1
+    # ขากลับ (สลับทาง) หรือคนละเวลา ยังสร้างได้
+    _, back = tools.run("create_trip", {**args, "origin": "เชียงใหม่", "destination": "ตำแหน่งปัจจุบัน"}, be, AUTH, HERE)
+    assert back
+
+
+def test_return_date_creates_the_return_trip_back_to_the_exact_start():
+    be = PlacesBackend([])
+    out, acts = tools.run("create_trip", {"origin": "ตำแหน่งปัจจุบัน", "destination": "เชียงใหม่", "stops": ["นครสวรรค์"],
+                                          "date": "2099-01-05", "time": "13:00", "return_date": "2099-01-07"}, be, AUTH, HERE)
+    posts = [c[2] for c in be.calls if c[:2] == ("POST", "/api/v1/trips")]
+    assert len(posts) == 2 and len(acts) == 2 and out["return_trip"]["created"]
+    go, back = posts
+    assert back["origin"] == go["destination"] and back["destination"] == go["origin"]  # จบที่ตำแหน่งปัจจุบันเป๊ะ
+    assert back["destination"]["name"] == "ตำแหน่งปัจจุบัน"
+    assert back["waypoints"] == go["waypoints"][::-1]
+    assert back["departure_time"] == "2099-01-07T06:00:00Z"  # ไม่บอกเวลากลับ ใช้ 13:00 เท่าขาไป
+
+
+def test_return_before_departure_creates_nothing():
+    be = PlacesBackend([])
+    out, acts = tools.run("create_trip", {"origin": "กรุงเทพ", "destination": "เชียงใหม่", "date": "2099-01-05",
+                                          "time": "13:00", "return_date": "2099-01-05", "return_time": "09:00"}, be, AUTH)
+    assert acts == [] and "หลังเวลาออก" in out["error"]
+    assert not any(c[:2] == ("POST", "/api/v1/trips") for c in be.calls)
+
+
+def test_done_reply_tells_about_the_return_trip_too():
+    import llm
+    text = llm.done_reply([{"created": True, "name": "Trip 02", "route_th": "ก > ข", "departure_th": "5 ม.ค.",
+                            "return_trip": {"created": True, "name": "Trip 03", "route_th": "ข > ก", "departure_th": "7 ม.ค."}}])
+    assert "Trip 02" in text and "Trip 03" in text

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Icon from "@/components/Icon";
 import { api, setToken } from "@/lib/api";
 
@@ -99,18 +99,83 @@ function strength(pw: string) {
 }
 const STRENGTH = ["", "พอใช้", "ดี", "ดีมาก", "แข็งแรงมาก"];
 
+// ปุ่ม Sign in with Google (สคริปต์ทางการของ Google) ได้ ID token แล้วส่งให้ api-backend ตรวจ
+// api-backend ไม่ได้ตั้ง GOOGLE_CLIENT_ID = ไม่แสดงปุ่ม (login แบบอีเมลใช้ได้ตามเดิม)
+type GoogleId = {
+  initialize: (o: { client_id: string; callback: (r: { credential: string }) => void }) => void;
+  renderButton: (el: HTMLElement, o: Record<string, unknown>) => void;
+};
+declare global {
+  interface Window {
+    google?: { accounts: { id: GoogleId } };
+  }
+}
+const GSI_SRC = "https://accounts.google.com/gsi/client";
+
+function GoogleButton({ busy, onCredential }: { busy: boolean; onCredential: (credential: string) => void }) {
+  const [clientId, setClientId] = useState<string | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const done = useRef(onCredential);
+  done.current = onCredential;
+  useEffect(() => {
+    api<{ google_client_id: string | null }>("/auth/config")
+      .then((c) => setClientId(c.google_client_id))
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (!clientId) return;
+    const draw = () => {
+      const g = window.google?.accounts.id;
+      if (!g || !box.current) return;
+      g.initialize({ client_id: clientId, callback: (r) => done.current(r.credential) });
+      g.renderButton(box.current, {
+        theme: document.documentElement.dataset.theme === "glass" ? "outline" : "filled_black",
+        size: "large",
+        shape: "pill",
+        text: "continue_with",
+        locale: "th",
+        width: Math.min(400, box.current.offsetWidth),
+      });
+    };
+    if (window.google?.accounts) return draw();
+    let script = document.querySelector<HTMLScriptElement>(`script[src="${GSI_SRC}"]`);
+    if (!script) {
+      script = document.createElement("script");
+      script.src = GSI_SRC;
+      script.async = true;
+      document.head.appendChild(script);
+    }
+    script.addEventListener("load", draw);
+    return () => script?.removeEventListener("load", draw);
+  }, [clientId]);
+  if (!clientId) return null;
+  return (
+    <div className="lc-google">
+      <div className="lc-or">
+        <span>หรือ</span>
+      </div>
+      <div ref={box} className="lc-gbtn" aria-disabled={busy} />
+      <p className="lc-legal">
+        การใช้งานถือว่ายอมรับ <a href="/terms">เงื่อนไขการใช้งาน</a> และ <a href="/privacy">นโยบายความเป็นส่วนตัว</a>
+      </p>
+    </div>
+  );
+}
+
 function LoginCard({
   mode,
   setMode,
   busy,
   error,
   onSubmit,
+  onGoogle,
 }: {
   mode: "login" | "register";
   setMode: (m: "login" | "register") => void;
   busy: boolean;
   error: string | null;
   onSubmit: (email: string, password: string) => void;
+  onGoogle: (credential: string) => void;
 }) {
   const [showPw, setShowPw] = useState(false);
   const [pw, setPw] = useState("");
@@ -248,6 +313,7 @@ function LoginCard({
             {!busy && <Icon name="chevron" size={18} />}
           </button>
         </form>
+        <GoogleButton busy={busy} onCredential={onGoogle} />
 
         <div className="lc-foot">
           <span>
@@ -284,6 +350,19 @@ export default function Login() {
         method: "POST",
         body: { email, password },
       });
+      setToken(token);
+      location.href = "/";
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  }
+
+  async function google(credential: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const { token } = await api<{ token: string }>("/auth/google", { method: "POST", body: { credential } });
       setToken(token);
       location.href = "/";
     } catch (e) {
@@ -356,6 +435,7 @@ export default function Login() {
                   busy={busy}
                   error={error}
                   onSubmit={submit}
+                  onGoogle={google}
                 />
               </section>
               <div className="auth-points">

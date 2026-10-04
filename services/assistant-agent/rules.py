@@ -22,6 +22,8 @@ NEXT_DAY = re.compile(r"วันถัดไป|พรุ่งนี้|อี
 OTHER_NUMBER = re.compile(r"\d")
 PERIOD = re.compile(r"(?:ช่วง|ตอน)?(เช้า|บ่าย|เย็น)")
 MOVE = re.compile(r"เลื่อน|ย้าย|เปลี่ยนเวลา")
+# ถามแบบสมมติ เช่น "ถ้าเลื่อน Trip 01 ไปบ่ายจะเสี่ยงน้อยลงไหม" ไม่ใช่คำสั่ง กฎห้ามเลื่อนจริง ส่งให้ LLM ตอบ
+WHAT_IF = re.compile(r"ถ้า|หาก|สมมติ|ไหม|มั้ย|หรือเปล่า|หรือไม่|\?")
 WEATHER = re.compile(r"อากาศ|ฝน|พยากรณ์")
 # พูดถึงทริปโดยไม่บอกเลข = ทริปที่ยังไม่ถึงเวลาออกและออกเร็วที่สุด
 NEAREST = re.compile(r"ใกล้(?:ที่)?สุด|ทริป(?:ถัดไป|ต่อไป|หน้า)")
@@ -52,7 +54,7 @@ def parse(message: str) -> Optional[dict]:
     trip_no = int(m.group(1)) if m else None
     nearest = trip_no is None and bool(NEAREST.search(message))
     rest = NEXT_DAY.sub(" ", TRIP_NO.sub(" ", message))
-    if MOVE.search(message) and not OTHER_NUMBER.search(rest):
+    if MOVE.search(message) and not OTHER_NUMBER.search(rest) and not WHAT_IF.search(message):
         p = PERIOD.search(message)
         hour = PERIOD_HOUR[p.group(1)] if p else None
         if NEXT_DAY.search(message):

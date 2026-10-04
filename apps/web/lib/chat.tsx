@@ -13,6 +13,9 @@ export type Conversation = { id: string; title: string; at: string; msgs: Msg[] 
 type ChatReply = { reply: string; actions?: ChatAction[]; warnings?: string[] };
 
 export const ACTION_TH: Record<string, string> = { TRIP_CREATED: "สร้าง", TRIP_UPDATED: "แก้", TRIP_DELETED: "ลบ" };
+// แนบสิ่งที่ระบบทำจริงไปกับข้อความใน history น้องกิเลนจะได้รู้ว่าคำตอบก่อนหน้าสร้าง/แก้ทริปสำเร็จจริงไหม
+const actionNote = (m: Msg) =>
+  m.actions?.length ? `\n(ระบบ: ${m.actions.map((a) => `${ACTION_TH[a.type]} Trip ${String(a.trip_no ?? "").padStart(2, "0")} สำเร็จ`).join(", ")})` : "";
 const HISTORY_LIMIT = 10; // ข้อความก่อนหน้าที่ส่งให้ assistant-agent
 const KEEP = 30; // เก็บประวัติบทสนทนาเก่าไว้สูงสุด
 const TIMEOUT_MS = 60_000;
@@ -46,7 +49,10 @@ export function useChat() {
 }
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
-  const { reloadTrips, email } = useApp();
+  const { reloadTrips, email, here, hereFallback } = useApp();
+  // ตำแหน่งจริงจาก GPS ให้ใช้เป็นต้นทางได้ ยังไม่ได้ตำแหน่งจริง (ใช้กรุงเทพแทนอยู่) ไม่ส่ง
+  const location = useRef<{ lat: number; lng: number } | null>(null);
+  location.current = hereFallback ? null : here;
   const [store, setStore] = useState<Store>({ current: fresh(), archive: [] });
   const [busy, setBusy] = useState(false);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
@@ -89,7 +95,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         .slice(1)
         .filter((m) => !m.error)
         .slice(-HISTORY_LIMIT)
-        .map((m) => ({ role: m.role === "me" ? "user" : "assistant", content: m.text }));
+        .map((m) => ({ role: m.role === "me" ? "user" : "assistant", content: m.text + actionNote(m) }));
       const convId = latest.current.current.id;
       update((c) => ({ ...c, msgs: [...c.msgs, { role: "me", text: t, at: new Date().toISOString() }] }));
       setBusy(true);
@@ -102,7 +108,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           return { ...s, archive: s.archive.map((c) => (c.id === convId ? { ...c, msgs: [...c.msgs, m] } : c)) };
         });
       try {
-        const r = await api<ChatReply>("/assistant/chat", { method: "POST", body: { message: t, history }, timeoutMs: TIMEOUT_MS, signal: ctrl.signal });
+        const r = await api<ChatReply>("/assistant/chat", { method: "POST", body: { message: t, history, location: location.current }, timeoutMs: TIMEOUT_MS, signal: ctrl.signal });
         const actions = (r.actions ?? []).filter((a) => a.type in ACTION_TH);
         reply({ role: "bot", text: r.reply, at: new Date().toISOString(), actions });
         if (actions.length) reloadTrips();

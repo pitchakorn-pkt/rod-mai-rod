@@ -218,7 +218,78 @@ def test_display_name_goes_into_the_model_context(monkeypatch):
     client.post("/api/v1/chat", headers=AUTH, json={"message": "ฉันชื่ออะไร", "user_name": "แพนด้า"})
     assert "คุณแพนด้า" in seen["context"]
     client.post("/api/v1/chat", headers=AUTH, json={"message": "ฉันชื่ออะไร"})
-    assert seen["context"] == ""
+    assert "คุณแพนด้า" not in seen["context"]
+
+
+def test_gps_location_goes_into_context_and_tools(monkeypatch):
+    seen, ran = {}, []
+    monkeypatch.setattr(agent, "safety_search", lambda q: [])
+    monkeypatch.setattr(agent, "trips_context", lambda auth: "")
+    monkeypatch.setattr(agent.tools, "run", lambda name, args, be, auth, here=None: ran.append(here) or ({}, []))
+
+    def fake_answer(message, history, sources, run_tool, context=""):
+        seen["context"] = context
+        run_tool("create_trip", {})
+        return {"reply": "ok", "actions": [], "warnings": []}
+
+    monkeypatch.setattr(agent.llm, "answer", fake_answer)
+    client.post("/api/v1/chat", headers=AUTH, json={"message": "ไปเชียงใหม่", "location": {"lat": 14.0357, "lng": 100.727}})
+    assert "14.0357, 100.7270" in seen["context"] and "ไม่ต้องถามต้นทาง" in seen["context"]
+    assert ran[-1] == {"lat": 14.0357, "lng": 100.727}
+    # ไม่ส่งมา หรือพิกัดนอกไทย = ไม่รู้ตำแหน่ง ต้องถามต้นทาง
+    for loc in (None, {"lat": 35.6, "lng": 139.7}, {"lat": "x"}):
+        client.post("/api/v1/chat", headers=AUTH, json={"message": "ไปเชียงใหม่", "location": loc})
+        assert "ห้ามเดาต้นทาง" in seen["context"] and ran[-1] is None
+
+
+def fake_llm(monkeypatch, replies, seen):
+    monkeypatch.setenv("LLM_PRIMARY", "groq")
+    monkeypatch.setenv("GROQ_API_KEY", "k")
+    monkeypatch.setenv("GROQ_MODEL", "groq-model")
+
+    class FakeClient:
+        def __init__(self, **kw):
+            self.chat = self
+            self.completions = self
+
+        def create(self, model, messages, **kw):
+            seen.append(messages[-1])
+            msg = type("M", (), {"tool_calls": None, **replies.pop(0)})
+            return type("R", (), {"choices": [type("C", (), {"message": msg})]})
+
+    monkeypatch.setattr(llm, "OpenAI", FakeClient)
+
+
+def test_claiming_a_trip_was_made_without_a_tool_is_sent_back(monkeypatch):
+    call = type("Call", (), {"id": "c1", "function": type("F", (), {"name": "create_trip", "arguments": "{}"})})
+    replies = [
+        {"content": "ผมสร้างทริปไปเชียงใหม่ให้แล้วครับ"},  # ไม่ได้เรียก tool
+        {"content": "", "tool_calls": [call]},
+        {"content": "สร้าง Trip 02 ไปเชียงใหม่แล้วครับ"},
+    ]
+    seen, ran = [], []
+    fake_llm(monkeypatch, replies, seen)
+    act = [{"type": "TRIP_CREATED", "trip_id": "t2", "trip_no": 2}]
+    out = llm.answer("สร้างเลย", [], [], run_tool=lambda name, args: (ran.append(name) or {"created": True}, act))
+    assert seen[1] == {"role": "user", "content": llm.CLAIM_NUDGE}
+    assert ran == ["create_trip"] and out["actions"] == act
+
+
+def test_claiming_twice_without_a_tool_tells_the_truth(monkeypatch):
+    replies = [{"content": "รับทราบครับ เดี๋ยวผมจัดให้เลย"}, {"content": "สร้างทริปเรียบร้อยแล้วครับ"}]
+    fake_llm(monkeypatch, replies, [])
+    out = llm.answer("สร้างทริปไปเชียงใหม่ให้หน่อย", [], [], run_tool=lambda name, args: ({}, []))
+    assert out["reply"] == llm.NOT_DONE_REPLY and out["actions"] == []
+
+
+def test_retelling_a_trip_the_system_really_made_is_fine():
+    history = [{"role": "assistant", "content": "สร้าง Trip 02 แล้ว\n(ระบบ: สร้าง Trip 02 สำเร็จ)"}]
+    assert not llm.false_claim("ทริปสร้างเรียบร้อยแล้วครับ", history)
+    assert llm.false_claim("ทริปสร้างเรียบร้อยแล้วครับ", [{"role": "assistant", "content": "สร้างให้แล้วครับ"}])
+    assert not llm.false_claim("สร้างทริปไม่สำเร็จครับ", [])
+    assert not llm.false_claim("ยังสร้างไม่ได้ ขาดต้นทาง", [])
+    # บันทึกจากระบบในประวัติไม่โผล่ในคำตอบ
+    assert llm.plain("สร้างแล้วครับ\n(ระบบ: สร้าง Trip 02 สำเร็จ)") == "สร้างแล้วครับ"
 
 
 def test_english_safety_question_is_searched_with_thai_words(monkeypatch):
@@ -230,3 +301,19 @@ def test_english_safety_question_is_searched_with_thai_words(monkeypatch):
     assert asked[-1] == "รถดับกลางน้ำทำไง"
     agent.safety_search("hello there")  # อังกฤษแต่ไม่มีคำสำคัญ ส่งตามเดิม
     assert asked[-1] == "hello there"
+
+
+def test_what_if_reply_is_not_treated_as_a_false_claim():
+    history = [{"role": "assistant", "content": "x"}]
+    assert not llm.false_claim("ถ้าเลื่อนไปออกบ่ายแล้ว ความเสี่ยงจะยังสูงอยู่ครับ", history)
+    assert not llm.false_claim("หากสร้างทริปไปภูเก็ตแล้วจะเจอฝนเล็กน้อย", history)
+    assert llm.false_claim("เลื่อน Trip 01 ไปบ่ายให้แล้วครับ", history)
+
+
+def test_chinese_slip_is_sent_back_then_removed(monkeypatch):
+    replies = [{"content": "ไปลบได้ที่หน้าทริปของฉัน那里ครับ"}, {"content": "ไปลบได้ที่หน้าทริปของฉัน那里ครับ"}]
+    seen = []
+    fake_llm(monkeypatch, replies, seen)
+    out = llm.answer("ลบ Trip 01 ให้หน่อย", [], [], run_tool=lambda name, args: ({}, []))
+    assert seen[1] == {"role": "user", "content": llm.CJK_NUDGE}
+    assert out["reply"] == "ไปลบได้ที่หน้าทริปของฉันครับ"

@@ -190,6 +190,8 @@ frontend ต้องแสดงแถบแจ้งเตือนตาม w
 |---|---|---|
 | POST | `/api/v1/auth/register` | สมัคร `{email, password}` |
 | POST | `/api/v1/auth/login` | ได้ `{token, user}` รหัสผิดทุกแบบ (รวมสั้นกว่า 6 ตัว) ได้ `UNAUTHORIZED` "อีเมลหรือรหัสผ่านไม่ถูกต้อง" |
+| GET | `/api/v1/auth/config` | `{google_client_id}` หน้า login ใช้วาดปุ่ม Google (`null` = ยังไม่ได้ตั้ง `GOOGLE_CLIENT_ID` ไม่แสดงปุ่ม) |
+| POST | `/api/v1/auth/google` | `{credential}` (ID token จากปุ่ม Sign in with Google) ได้ `{token, user}` เหมือน login · อีเมลที่มีบัญชีอยู่แล้ว = เข้าบัญชีเดิม · ครั้งแรกสร้างบัญชีให้พร้อมชื่อจาก Google · token ไม่ถูกต้อง `UNAUTHORIZED` |
 | GET | `/api/v1/me` | ข้อมูลผู้ใช้ที่ login อยู่ `{user_id, email, display_name}` (`display_name` เป็น `null` ถ้ายังไม่ได้ตั้ง) |
 | PATCH | `/api/v1/me` | ตั้งชื่อที่แสดง `{display_name}` ไม่เกิน 40 ตัว ส่งว่างหรือ `null` = ลบชื่อ ได้ผู้ใช้กลับมา น้องกิเลนเรียกผู้ใช้ด้วยชื่อนี้ |
 | POST | `/api/v1/me/password` | เปลี่ยนรหัส `{current_password, new_password}` รหัสเดิมผิดได้ `VALIDATION_ERROR` "รหัสผ่านเดิมไม่ถูกต้อง" ได้ `{"changed": true}` จำกัด 10 ครั้งต่อนาที |
@@ -205,7 +207,7 @@ frontend ต้องแสดงแถบแจ้งเตือนตาม w
 | GET | `/api/v1/maps/flood/{window}/{z}/{x}/{y}` | ภาพชั้นน้ำท่วม GISTDA (PNG) `window` = `1day` `3days` `7days` `30days` ส่งต่อพร้อม key ฝั่ง server **key ห้ามถึงหน้าเว็บ** |
 | GET | `/api/v1/weather/area?lat=&lng=` | สภาพอากาศแบบพื้นที่รอบจุด (ใช้ตอนยังไม่มีทริป) |
 | GET | `/api/v1/hazards?min_lat=&min_lng=&max_lat=&max_lng=` | หมุดภัยในกรอบแผนที่ (Safety Map) กรอบกลับด้าน (min > max) ได้ `VALIDATION_ERROR` |
-| POST | `/api/v1/assistant/chat` | `{message, history[]}` ได้ `ChatReply` |
+| POST | `/api/v1/assistant/chat` | `{message, history[], location?}` ได้ `ChatReply` (`location` = `{lat, lng}` จาก GPS ของผู้ใช้ ส่งเมื่อได้ตำแหน่งจริง ใช้เป็นต้นทางตอนแชทสร้างทริป) |
 | GET | `/api/v1/safety/emergency?hazard_type=` | คำแนะนำฉุกเฉินของภัยชนิดนั้น ได้ `Emergency` (แสดงเมื่อเส้นทางหรือหมุดภัยเป็น HIGH) |
 | GET | `/api/v1/places/search?q=` | ค้นสถานที่ในไทยจากชื่อที่พิมพ์ (ช่องปักหมุดในฟอร์มทริป) ได้ `{"places": [Place...]}` ไม่เกิน 5 ตัว (รูปแบบด้านล่าง) |
 | GET | `/api/v1/places/nearby?lat=&lng=[&radius_km=&kinds=]` | สถานที่เที่ยวใกล้ตำแหน่ง ได้ `{"places": [NearbyPlace...]}` เรียงจากใกล้ไปไกล ไม่ส่ง `radius_km`/`kinds` = 5 กม. ไม่เกิน 8 ตัว (แบบเดิม) ส่ง = รัศมี 1-20 กม. ไม่เกิน 20 ตัว เลือกกระจายตั้งแต่วงใกล้ถึงวงไกล (หน้าหลักใช้ 20 กม. แชทใช้ตามแนวที่ผู้ใช้ขอ) |
@@ -234,7 +236,7 @@ frontend ต้องแสดงแถบแจ้งเตือนตาม w
 
 | Method | Path | ใช้ทำอะไร |
 |---|---|---|
-| POST | `/api/v1/chat` | `{message, history[], user_name}` + header `Authorization` ของผู้ใช้ ได้ `ChatReply` (`user_name` = ชื่อในโปรไฟล์ api-backend ใส่ให้ อาจเป็น `null`) |
+| POST | `/api/v1/chat` | `{message, history[], user_name, location}` + header `Authorization` ของผู้ใช้ ได้ `ChatReply` (`user_name` = ชื่อในโปรไฟล์ api-backend ใส่ให้ อาจเป็น `null` · `location` ส่งต่อจากหน้าเว็บ อาจเป็น `null`) |
 
 ### safety-knowledge
 
