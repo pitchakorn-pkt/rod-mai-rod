@@ -4,8 +4,23 @@
 **ผู้รับผิดชอบ**: Pathumporn Jorrapong (@pathumpornjorrapong-ops)
 **branch**: `feature/weather-disaster/<ชื่อ>`
 **endpoint**: `POST /api/v1/forecast/points`, `GET /api/v1/area`, `GET /api/v1/hazards` (`docs/CONTRACT.md` หัวข้อ 6)
-**เรียกใคร**: Open-Meteo, GDACS, USGS, Thaiwater (ถ้าได้ key), TMD (ถ้าได้ key)
+**เรียกใคร**: Open-Meteo, GDACS, USGS, GISTDA (ต้องมี `GISTDA_API_KEY`), HDMS กรมทางหลวง (Thaiwater / TMD เตรียมชื่อตัวแปรไว้แต่ยังไม่ได้ต่อ)
 **ใครเรียกเรา**: risk-decision, api-backend
+
+## ทำอะไรได้แล้วตอนนี้
+
+| แหล่ง | ไฟล์ | ได้อะไร |
+|---|---|---|
+| Open-Meteo | `app.py` | พยากรณ์รายชั่วโมง ณ เวลาที่ขอ (`forecast/points`), อากาศรอบตัว 5 ทิศ (`area`), หมุดฝน/ลมตอนนี้ |
+| GDACS | `hazard_feeds.py` | น้ำท่วม พายุหมุนเขตร้อน (กรองกรอบประเทศไทย) |
+| USGS | `hazard_feeds.py` | แผ่นดินไหว ขนาด 4.0 ขึ้นไป 7 วันล่าสุด (ขยายกรอบ 2 องศาให้รวมใกล้ชายแดน) |
+| ประเมินเอง | `hazard_feeds.py` | เสี่ยงดินถล่มจากฝนสะสมในพื้นที่ภูเขา (`source: DERIVED` เขียนชัดว่าประเมิน) |
+| GISTDA | `gistda.py` | น้ำท่วมจากดาวเทียม 3 วัน (ว่างใช้ 7 วัน) รวมเป็นรายตำบล พร้อม `road_cells` ให้ risk-decision เช็กถนนที่ท่วม · ดึงเบื้องหลังทุก 30 นาที ไม่มี key = ข้าม |
+| HDMS กรมทางหลวง | `doh.py` | เหตุน้ำท่วม/ดินถล่มบนทางหลวงที่ยังไม่จบ: ทล./กม., ระดับน้ำ, ปิดถนน, ทางเลี่ยง · ระดับ: ปิดถนนหรือน้ำ ≥ 35 ซม. = HIGH, 15-34 ซม. หรือดินถล่ม = MEDIUM · `source: DOH` · ดึงเบื้องหลังทุก 15 นาที ย้อนหลัง 60 วัน ล่มแล้วใช้ผลล่าสุด · `DOH_HDMS=false` ปิด · ปิดเองใน `DEMO_MODE` |
+
+**ข้อควรรู้ของ HDMS**: เป็น API ภายในของหน้าเว็บ hdms.doh.go.th ไม่ใช่ open data ทางการ รูปแบบอาจเปลี่ยนได้ ตัวอย่างข้อมูลจริงสำหรับเทสต์อยู่ใน `tests/hdms_sample.json` · `lane_closure: false` แปลว่า **ผ่านไม่ได้** (ตั้งชื่อกลับด้าน)
+
+cache หมุดภัย 10 นาที · แหล่งไหนล่มส่งที่เหลือพร้อม `HAZARD_FEED_UNAVAILABLE` · เทสต์ 109 ข้อ
 
 ## รันเดี่ยว
 
