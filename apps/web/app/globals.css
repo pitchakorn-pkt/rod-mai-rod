@@ -1726,6 +1726,8 @@ html[data-map="dark"] .map, html[data-map="dark"] .map .leaflet-container { back
 }
 .ph.big:hover { background: rgba(255, 255, 255, 0.14); }
 .ph.big .ph-num { font-size: calc(28px * var(--fs)); min-width: 80px; }
+/* ธีมมืด: เบอร์บนการ์ดสีแดงเดิมเป็นแดงอ่อนบนพื้นแดง (คอนทราสต์ 1.6) แทบมองไม่เห็น (ธีมขาวการ์ดสีอ่อน ใช้สีเดิม) */
+html:not([data-theme="glass"]) .sos-card .ph.big .ph-num { color: #ffffff; }
 .ph.big .ph-act { width: 40px; height: 40px; border-radius: 50%; background: var(--high); color: #fff; }
 
 .phonebook .dash-scroll { display: grid; gap: 10px; align-content: start; }
