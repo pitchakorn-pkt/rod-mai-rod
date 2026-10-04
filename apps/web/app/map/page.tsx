@@ -148,7 +148,7 @@ function MapSearch({ hazards, onPlace, onHazard }: { hazards: Hazard[]; onPlace:
     </div>
   );
 }
-const SOURCE_TH: Record<string, string> = { GISTDA: "ภาพถ่ายดาวเทียม GISTDA (สทอภ.)", OPEN_METEO: "พยากรณ์อากาศชั่วโมงนี้", GDACS: "GDACS", USGS: "USGS", DERIVED: "ประเมินโดยระบบ ไม่ใช่ประกาศทางการ" };
+const SOURCE_TH: Record<string, string> = { GISTDA: "ภาพถ่ายดาวเทียม GISTDA (สทอภ.)", DOH: "กรมทางหลวง (ศูนย์บริหารงานอุบัติภัย)", OPEN_METEO: "พยากรณ์อากาศชั่วโมงนี้", GDACS: "GDACS", USGS: "USGS", DERIVED: "ประเมินโดยระบบ ไม่ใช่ประกาศทางการ" };
 
 function RiskMap() {
   const focus = useSearchParams().get("focus");
@@ -384,6 +384,12 @@ function RiskMap() {
             <p className="row tiny muted" style={{ gap: 6, margin: "12px 0" }}>
               <Icon name="clock" size={14} /> อัปเดต {thaiDateTime(sel.updated_at)} · {SOURCE_TH[sel.source] ?? sel.source}
             </p>
+            {sel.source === "DOH" && (
+              <div className="notice" style={{ marginBottom: 12 }}>
+                <Icon name="info" size={18} />
+                <span className="small">เหตุบนทางหลวงที่กรมทางหลวงรายงานและยังไม่จบ สอบถามสภาพถนนล่าสุดได้ที่สายด่วนกรมทางหลวง 1586</span>
+              </div>
+            )}
             {sel.source === "GISTDA" && (
               <div className="notice" style={{ marginBottom: 12 }}>
                 <Icon name="info" size={18} />

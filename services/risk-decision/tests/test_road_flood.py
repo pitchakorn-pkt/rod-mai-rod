@@ -47,3 +47,32 @@ def test_flooded_road_on_route_is_high_at_the_nearest_check_point(monkeypatch):
     data = _evaluate(monkeypatch, [flood("on", 14.5, 100.2, [[14.39, 100.001]])], LINE)
     assert data["routes"][0]["risk_level"] == "HIGH"
     assert "น้ำท่วม on" in data["summary_th"]
+
+
+def doh_closure(hid, lat, lng, severity="HIGH", hazard_type="FLOOD"):
+    """รูปแบบเดียวกับที่ weather-disaster/doh.py ส่งมา: จุดเหตุบนทางหลวง = road_cells จุดเดียว"""
+    return {"hazard_id": hid, "hazard_type": hazard_type, "severity": severity, "lat": lat, "lng": lng,
+            "province": None, "title_th": f"ปิดถนน {hid}", "source": "DOH", "updated_at": T,
+            "road_cells": [[round(lat, 4), round(lng, 4)]]}
+
+
+def test_highway_closure_on_route_makes_it_high(monkeypatch):
+    data = _evaluate(monkeypatch, [doh_closure("doh-1", 14.25, 100.0)], LINE)
+    assert data["routes"][0]["risk_level"] == "HIGH"
+    assert "ปิดถนน doh-1" in data["summary_th"]
+
+
+def test_highway_closure_on_another_road_is_ignored(monkeypatch):
+    # ทางหลวงอีกสายห่างไป ~3 กม. ไม่ใช่ถนนที่เราวิ่ง (รัศมี 10 กม. แบบเดิมจะนับผิด)
+    data = _evaluate(monkeypatch, [doh_closure("doh-2", 14.25, 100.03)], LINE)
+    assert data["routes"][0]["risk_level"] == "LOW"
+
+
+def test_passable_highway_flood_does_not_raise_risk(monkeypatch):
+    data = _evaluate(monkeypatch, [doh_closure("doh-3", 14.25, 100.0, severity="LOW")], LINE)
+    assert data["routes"][0]["risk_level"] == "LOW"
+
+
+def test_landslide_on_route_counts_through_road_point(monkeypatch):
+    data = _evaluate(monkeypatch, [doh_closure("doh-4", 14.25, 100.0, severity="MEDIUM", hazard_type="LANDSLIDE_RISK")], LINE)
+    assert data["routes"][0]["risk_level"] == "MEDIUM"

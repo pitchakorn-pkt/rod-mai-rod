@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+import doh
 import gistda
 import hazard_feeds
 import weather
@@ -31,6 +32,9 @@ def warm_hazards():
         threading.Thread(target=hazard_feeds.keep_warm, daemon=True).start()
     if not DEMO_MODE and gistda.enabled():
         threading.Thread(target=gistda.keep_fresh, daemon=True).start()
+    # ถนนปิด/น้ำท่วมทางหลวงจากกรมทางหลวง ใช้สวิตช์เดียวกับ warm-up (เทสต์ปิดไว้ ไม่ให้ยิงเน็ตจริง)
+    if not DEMO_MODE and doh.enabled() and os.getenv("HAZARD_WARMUP", "true").lower() == "true":
+        threading.Thread(target=doh.keep_fresh, daemon=True).start()
 
 
 class TimedPoint(BaseModel):
