@@ -381,7 +381,6 @@ frontend ต้องแสดงแถบแจ้งเตือนตาม w
 ## 9. Hosting
 
 - เว็บที่ใช้งานจริงตอนนี้: https://rod-mai-rod.tntproduction.tech รันด้วย `docker compose up -d --build` บนเซิร์ฟเวอร์ที่มีแรมอย่างน้อย 2 GB (ระบบใช้ราว 650 MB ตอนว่าง) อัปเดตด้วย `git pull` แล้วสั่งคำสั่งเดิม
-- ไฟล์ `render.yaml` และ `deploy/render/` เป็นของช่วงที่เคยขึ้น Render ตอนนี้ไม่ได้ใช้แล้ว
 - เปลี่ยนโดเมน: ต้องเพิ่มโดเมนใหม่ใน Google Cloud (Authorized JavaScript origins) ไม่งั้นปุ่มเข้าสู่ระบบด้วย Google ใช้ไม่ได้
 - บริการใหม่อ่านที่อยู่ของบริการอื่นจาก env เท่านั้น (ใน docker compose คือ `http://<ชื่อบริการ>:8000`) ห้ามเขียนตายตัว
 
