@@ -41,6 +41,8 @@ SYSTEM_PROMPT = (
     "ระดับความเสี่ยงของทริปมาจากระบบเท่านั้น คุณไม่ได้เป็นคนตัดสิน "
     "ถ้าผู้ใช้สั่งดู สร้าง หรือแก้ทริป ให้เรียก tools ที่มี ห้ามบอกว่าทำแล้วถ้า tool ไม่ได้ตอบว่าสำเร็จ "
     "ห้ามตอบว่า เดี๋ยวจัดให้ หรือ กำลังสร้าง แล้วจบโดยไม่เรียก tool ข้อมูลครบให้เรียกเลย ไม่ครบให้ถามข้อที่ขาด "
+    "คำถามแบบสมมติ เช่น ถ้าเลื่อนทริปไปบ่ายจะเสี่ยงน้อยลงไหม ห้ามแก้ทริป ให้ตอบจากข้อมูลที่มีหรือบอกให้ดูการ์ด "
+    "ออกเวลาไหนดี ในหน้าทริปของฉัน แล้วถามว่าจะให้เลื่อนจริงไหม "
     "ในประวัติแชท คำตอบที่ระบบสร้างหรือแก้ทริปสำเร็จจริงจะมีวงเล็บ (ระบบ: ...) ต่อท้าย "
     "คำตอบก่อนหน้าที่บอกว่าสร้างแล้วแต่ไม่มีวงเล็บนี้ แปลว่ายังไม่ได้สร้างจริง ให้เรียก create_trip ตอนนี้ "
     "ผู้ใช้ถามว่าสร้างเสร็จหรือยัง ให้ตอบจากวงเล็บนี้และรายการทริปในข้อมูลบริบท ห้ามพิมพ์วงเล็บ (ระบบ: ...) ในคำตอบ "
@@ -126,6 +128,7 @@ def build_messages(message: str, history: list[dict], sources: list[dict], conte
 def plain(text: str) -> str:
     """หน้าแชทแสดงข้อความธรรมดา โมเดลบางตัวยังใส่ markdown มาแม้สั่งห้าม ตัดทิ้งก่อนส่ง"""
     text = SYSTEM_NOTE.sub("", text)  # บันทึกจากระบบในประวัติ โมเดลอาจพิมพ์ตาม
+    text = CJK.sub("", text)  # เขียนใหม่แล้วยังมีตัวจีนหลุด ตัดทิ้ง (เว็บตอบแค่ไทย/อังกฤษ)
     text = re.sub(r"\*\*|__|`|[​-‍﻿]", "", text)  # อักขระล่องหนติดมากับชื่อใน OSM
     text = re.sub(r"^(\s*)[*•]\s+", r"\1- ", text, flags=re.MULTILINE)  # Gemini ใช้ * เป็นหัวข้อย่อย
     text = text.replace("*", "")  # ตัวเอียง *(หมายเหตุ)* ที่เหลือ
@@ -210,10 +213,14 @@ NOT_DONE_REPLY = "ยังสร้างหรือแก้ทริปใ�
 SYSTEM_NOTE = re.compile(r"\s*\(ระบบ:[^)]*\)")
 
 
+def _is_claim(m: re.Match, text: str) -> bool:
+    # "สร้างไม่สำเร็จ" "ยังแก้ไม่ได้" เป็นการบอกตรงๆ, "ถ้าเลื่อนไปบ่ายแล้ว..." เป็นสมมติ ไม่ใช่อ้างว่าทำแล้ว
+    return "ไม่" not in m.group(0) and not re.search(r"(ถ้า|หาก|สมมติ)\S*\s*$", text[max(0, m.start() - 12):m.start()])
+
+
 def false_claim(text: str, messages: list[dict]) -> bool:
     """บอกว่าทำแล้วโดยไม่มี tool รอบนี้ ยกเว้นคำตอบก่อนหน้ามีบันทึกจากระบบ (ทำสำเร็จไปแล้วจริง กำลังเล่าซ้ำ)"""
-    # "สร้างไม่สำเร็จ" "ยังแก้ไม่ได้" เป็นการบอกตรงๆ ไม่ใช่อ้างว่าทำแล้ว
-    if not any("ไม่" not in m.group(0) for m in CLAIM.finditer(text)):
+    if not any(_is_claim(m, text) for m in CLAIM.finditer(text)):
         return False
     last_bot = next((m["content"] for m in reversed(messages) if m["role"] == "assistant"), "")
     return "(ระบบ:" not in last_bot
@@ -222,6 +229,11 @@ def false_claim(text: str, messages: list[dict]) -> bool:
 # ถามภาษาอังกฤษ แต่ Qwen มักตอบไทยตามข้อมูลจาก tool ที่เป็นภาษาไทย แม้ system สั่งแล้ว
 ENGLISH_NUDGE = ("The user wrote in English. Rewrite your previous answer entirely in English. "
                  "Keep the same facts and numbers, and write Thai place names in English letters.")
+
+
+# Qwen บางครั้งหลุดตัวอักษรจีนกลางประโยคไทย เช่น "ลบจาก那里ได้เลย"
+CJK = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]+")
+CJK_NUDGE = "คำตอบก่อนหน้ามีตัวอักษรภาษาจีน เขียนใหม่เป็นภาษาไทยทั้งหมด ข้อมูลเหมือนเดิม"
 
 
 def _thai(text: str) -> int:
@@ -243,7 +255,7 @@ def complete(messages: list[dict], run_tool: Optional[RunTool] = None) -> tuple[
     changed: list[dict] = []
     for p in providers():
         convo = list(messages)
-        used_tool = nudged = relang = claimed = False
+        used_tool = nudged = relang = claimed = recjk = False
         try:
             client = OpenAI(api_key=p["api_key"], base_url=p["base_url"], timeout=LLM_TIMEOUT, max_retries=0)
             extra = {"tools": tools.SCHEMAS} if run_tool else {}
@@ -265,6 +277,10 @@ def complete(messages: list[dict], run_tool: Optional[RunTool] = None) -> tuple[
                             return NOT_DONE_REPLY, unique(actions), changed
                         claimed = True
                         convo += [{"role": "assistant", "content": msg.content or ""}, {"role": "user", "content": CLAIM_NUDGE}]
+                        continue
+                    if text and not recjk and CJK.search(msg.content or "") and not CJK.search(messages[-1]["content"]):
+                        recjk = True
+                        convo += [{"role": "assistant", "content": msg.content or ""}, {"role": "user", "content": CJK_NUDGE}]
                         continue
                     if text and not relang and wrong_language(text, messages[-1]["content"]):
                         relang = True

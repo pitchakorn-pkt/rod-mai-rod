@@ -301,3 +301,19 @@ def test_english_safety_question_is_searched_with_thai_words(monkeypatch):
     assert asked[-1] == "รถดับกลางน้ำทำไง"
     agent.safety_search("hello there")  # อังกฤษแต่ไม่มีคำสำคัญ ส่งตามเดิม
     assert asked[-1] == "hello there"
+
+
+def test_what_if_reply_is_not_treated_as_a_false_claim():
+    history = [{"role": "assistant", "content": "x"}]
+    assert not llm.false_claim("ถ้าเลื่อนไปออกบ่ายแล้ว ความเสี่ยงจะยังสูงอยู่ครับ", history)
+    assert not llm.false_claim("หากสร้างทริปไปภูเก็ตแล้วจะเจอฝนเล็กน้อย", history)
+    assert llm.false_claim("เลื่อน Trip 01 ไปบ่ายให้แล้วครับ", history)
+
+
+def test_chinese_slip_is_sent_back_then_removed(monkeypatch):
+    replies = [{"content": "ไปลบได้ที่หน้าทริปของฉัน那里ครับ"}, {"content": "ไปลบได้ที่หน้าทริปของฉัน那里ครับ"}]
+    seen = []
+    fake_llm(monkeypatch, replies, seen)
+    out = llm.answer("ลบ Trip 01 ให้หน่อย", [], [], run_tool=lambda name, args: ({}, []))
+    assert seen[1] == {"role": "user", "content": llm.CJK_NUDGE}
+    assert out["reply"] == "ไปลบได้ที่หน้าทริปของฉันครับ"
