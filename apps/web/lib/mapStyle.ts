@@ -1,4 +1,4 @@
-// สไตล์แผนที่ทั้งเว็บ: ใช้ OpenStreetMap (ชื่อภาษาไทย ไม่ต้องมี key) แล้วแต่งสีด้วย CSS filter (globals.css .base-tiles)
+// สไตล์แผนที่ทั้งเว็บ: ใช้แผนที่ Esri (ชื่อภาษาอังกฤษทั้งแผนที่ ไม่ต้องมี key) แล้วแต่งสีด้วย CSS filter (globals.css .base-tiles)
 // จำที่ผู้ใช้เลือกไว้ในเครื่อง
 export type MapStyle = "soft" | "original" | "dark";
 const KEY = "rmr_redesign_map_style";

@@ -130,7 +130,8 @@ function RiskRing({ level, score }: { level: Risk; score: number | null }) {
 
 function Home() {
   const empty = useSearchParams().get("empty") === "1";
-  const { trips, nextTrip, hazards, area, email, emergency, planTrip, here: me } = useApp();
+  const { trips, nextTrip, hazards, area, email, displayName, emergency, planTrip, here: me, hereFallback, locate } = useApp();
+  const [locateFailed, setLocateFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   // ลากเส้นแบ่งปรับขนาดการ์ด: ซ้าย/ขวา แถวบน/ล่าง และการ์ด 3 ใบล่าง (จำกัดขนาดขั้นต่ำป้องกันตัวหนังสือล้น)
   const cols = useSplit("home_cols", [1, 1], { cssVar: "--home-cols", min: 0.35, label: "การ์ดซ้ายขวา" });
@@ -192,7 +193,7 @@ function Home() {
   const here = area?.cells.length
     ? area.cells.reduce((a, b) => (Math.hypot(b.lat - area.center.lat, b.lng - area.center.lng) < Math.hypot(a.lat - area.center.lat, a.lng - area.center.lng) ? b : a))
     : null;
-  const name = email?.split("@")[0];
+  const name = displayName ?? email?.split("@")[0];
   const reco = plan ? RECO[plan.recommendation] : null;
   const today = new Date().toLocaleDateString("th-TH", { timeZone: "Asia/Bangkok", weekday: "long", day: "numeric", month: "long" });
   const hotline = emergency.FLOOD?.contacts?.[0] ?? { name_th: "สายด่วนนิรภัย ปภ.", phone: "1784" };
@@ -387,8 +388,13 @@ function Home() {
             <p className="route-legend" style={{ margin: "8px 2px 0" }}>
               <span>
                 <span className="me-dot static" />
-                ตำแหน่งของคุณ
+                {hereFallback ? "ยังไม่ได้ตำแหน่งจริง แสดงรอบกรุงเทพแทน" : "ตำแหน่งของคุณ"}
               </span>
+              {hereFallback && (
+                <button className="link-btn tiny" onClick={async () => setLocateFailed(!(await locate()))}>
+                  {locateFailed ? "เบราว์เซอร์ไม่ให้ใช้ตำแหน่ง ลองอนุญาตแล้วกดอีกครั้ง" : "ใช้ตำแหน่งจริง"}
+                </button>
+              )}
               <span>
                 <i style={{ background: "#7a6af2", height: 2 }} />
                 รัศมี {EXPLORE_KM} กม.

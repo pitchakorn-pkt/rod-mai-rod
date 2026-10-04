@@ -6,6 +6,7 @@ import pytest
 
 import places
 from envelope import ApiError
+from geo import haversine_km
 
 CNX = (18.79, 98.98)
 
@@ -167,13 +168,13 @@ def test_slow_overpass_keeps_downloading_and_next_call_hits_cache(overpass, monk
 # ---------- หมวดสถานที่ + รัศมี (แชทแนะนำที่เที่ยวตามแนว) ----------
 
 def test_kinds_and_radius_change_the_query_and_limit(overpass):
-    cafes = [node(f"คาเฟ่ {i}", 18.79 + i * 0.001, 98.98, amenity="cafe") for i in range(20)]
+    cafes = [node(f"คาเฟ่ {i}", 18.79 + i * 0.001, 98.98, amenity="cafe") for i in range(25)]
     sent = overpass(cafes)
     found = places.nearby(*CNX, radius_km=15, kinds=("cafe",))
     query = sent[0]["data"]["data"]
     assert "[bbox:18.6549," in query and '["amenity"="cafe"]' in query
     assert "tourism" not in query
-    assert len(found) == 15 and found[0]["kind_th"] == "คาเฟ่"
+    assert len(found) == 20 and found[0]["kind_th"] == "คาเฟ่"
 
 
 def test_way_uses_center_point(overpass):
@@ -232,3 +233,15 @@ def test_both_down_keeps_the_overpass_error(overpass):
     with pytest.raises(ApiError) as e:
         places.nearby(*CNX)
     assert e.value.code == "UPSTREAM_ERROR"
+
+
+def test_wide_radius_spreads_out_instead_of_only_the_nearest(overpass):
+    # 30 ที่กองอยู่ใกล้ตัวไม่เกิน 2 กม. + 5 ที่อยู่ไกล 10-18 กม. ต้องได้ที่ไกลมาด้วย
+    near = [node(f"ใกล้ {i}", 18.79 + i * 0.0005, 98.98, tourism="museum") for i in range(30)]
+    far = [node(f"ไกล {i}", 18.79 + 0.09 + i * 0.015, 98.98, tourism="viewpoint") for i in range(5)]
+    overpass(near + far)
+    found = places.nearby(*CNX, radius_km=20)
+    assert len(found) == 20
+    assert sum(p["name"].startswith("ไกล") for p in found) == 5
+    dist = [haversine_km({"lat": CNX[0], "lng": CNX[1]}, p) for p in found]
+    assert dist == sorted(dist)

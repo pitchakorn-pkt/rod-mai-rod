@@ -116,6 +116,11 @@ def setup(app: FastAPI, service_name: str, health_check=None) -> None:
         return {"status": "ok", "service": service_name}
 
 
+# client ตัวเดียวใช้ร่วมกันทุกคำขอ httpx.request() สร้าง client ใหม่ทุกครั้ง ต้องโหลดใบรับรอง SSL ใหม่
+# กิน CPU ราว 100 ms ต่อครั้งตอนคนใช้พร้อมกัน (เครื่อง 1 CPU บน Render ตันที่จุดนี้)
+_client = httpx.Client()
+
+
 def call(url_env: str, method: str, path: str, *, timeout: float, json=None, params=None, headers=None):
     """เรียก service อื่นแล้วคืนค่า data ถ้าพังจะ raise ApiError ที่ส่งต่อให้ผู้ใช้ได้เลย
 
@@ -127,7 +132,7 @@ def call(url_env: str, method: str, path: str, *, timeout: float, json=None, par
     name = url_env.removesuffix("_URL").lower().replace("_", "-")
     hdrs = {"X-Request-ID": _request_id.get() or str(uuid.uuid4()), **(headers or {})}
     try:
-        res = httpx.request(method, base.rstrip("/") + path, json=json, params=params, headers=hdrs, timeout=timeout)
+        res = _client.request(method, base.rstrip("/") + path, json=json, params=params, headers=hdrs, timeout=timeout)
         body = res.json()
     except httpx.TimeoutException:
         raise ApiError("UPSTREAM_TIMEOUT", f"ระบบ {name} ตอบไม่ทันเวลา ลองใหม่อีกครั้ง")

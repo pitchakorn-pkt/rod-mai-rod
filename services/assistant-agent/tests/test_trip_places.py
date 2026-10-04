@@ -196,6 +196,39 @@ def test_place_conditions_asks_again_for_unknown_place():
     assert "ไม่เจอ" in out["error"]
 
 
+# ---------- ภัยตอนนี้ทั้งประเทศ / รายจังหวัด ----------
+
+def test_hazards_now_country_wide_puts_closed_highways_first():
+    be = ConditionsBackend([], [
+        hazard("sat", 15.7, 100.1, province="นครสวรรค์"),
+        {**hazard("doh-closed", 15.71, 100.08, province="นครสวรรค์"), "source": "DOH", "title_th": "ทล.1 กม.345+700 · ปิดถนน"},
+        {**hazard("doh-low", 14.0, 100.6, province="ปทุมธานี"), "source": "DOH", "severity": "LOW"},
+        {**hazard("slide", 18.5, 98.9, province="เชียงใหม่"), "hazard_type": "LANDSLIDE_RISK", "severity": "MEDIUM", "source": "DOH"},
+        {**hazard("now", 13.7, 100.5), "hazard_type": "RAIN", "source": "OPEN_METEO"},
+    ])
+    out, actions = run("hazards_now", {}, be)
+    assert actions == []
+    assert be.calls[-1][2] == tools.THAILAND_BOX
+    assert [h["title_th"] for h in out["hazards"]][:2] == ["ทล.1 กม.345+700 · ปิดถนน", "น้ำท่วม sat"]  # สูงก่อน ถนนปิดก่อน
+    assert "น้ำท่วม now" not in [h["title_th"] for h in out["hazards"]]  # ฝนชั่วโมงนี้ไม่นับ
+    assert out["summary_th"].startswith("ทั่วประเทศ มีภัย 4 จุด ระดับสูง 2 จุด") and "35 ซม. 1 จุด" in out["summary_th"]
+    assert out["hazards"][0]["source_th"] == "กรมทางหลวง"
+    assert [h["type_th"] for h in out["hazards"] if h["title_th"] == "น้ำท่วม slide"] == ["ดินถล่ม"]
+
+
+def test_hazards_now_filters_by_province_and_type():
+    be = ConditionsBackend([], [
+        hazard("a", 15.7, 100.1, province="นครสวรรค์"),
+        {**hazard("b", 18.5, 98.9, province="เชียงใหม่"), "hazard_type": "LANDSLIDE_RISK"},
+    ])
+    out, _ = run("hazards_now", {"province": "จังหวัดนครสวรรค์"}, be)
+    assert [h["title_th"] for h in out["hazards"]] == ["น้ำท่วม a"] and out["summary_th"].startswith("จังหวัดนครสวรรค์ มีภัย 1 จุด")
+    out, _ = run("hazards_now", {"hazard_type": "LANDSLIDE_RISK"}, be)
+    assert [h["title_th"] for h in out["hazards"]] == ["น้ำท่วม b"]
+    out, _ = run("hazards_now", {"province": "ภูเก็ต"}, be)
+    assert out["hazards"] == [] and out["summary_th"] == "จังหวัดภูเก็ต ไม่มีรายงานภัยตอนนี้"
+
+
 # ---------- เบอร์ฉุกเฉินจากระบบเท่านั้น ----------
 
 class SafetyBackend(PlacesBackend):
