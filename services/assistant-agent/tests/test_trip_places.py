@@ -290,3 +290,31 @@ def test_same_route_and_time_is_not_created_twice():
     # ขากลับ (สลับทาง) หรือคนละเวลา ยังสร้างได้
     _, back = tools.run("create_trip", {**args, "origin": "เชียงใหม่", "destination": "ตำแหน่งปัจจุบัน"}, be, AUTH, HERE)
     assert back
+
+
+def test_return_date_creates_the_return_trip_back_to_the_exact_start():
+    be = PlacesBackend([])
+    out, acts = tools.run("create_trip", {"origin": "ตำแหน่งปัจจุบัน", "destination": "เชียงใหม่", "stops": ["นครสวรรค์"],
+                                          "date": "2099-01-05", "time": "13:00", "return_date": "2099-01-07"}, be, AUTH, HERE)
+    posts = [c[2] for c in be.calls if c[:2] == ("POST", "/api/v1/trips")]
+    assert len(posts) == 2 and len(acts) == 2 and out["return_trip"]["created"]
+    go, back = posts
+    assert back["origin"] == go["destination"] and back["destination"] == go["origin"]  # จบที่ตำแหน่งปัจจุบันเป๊ะ
+    assert back["destination"]["name"] == "ตำแหน่งปัจจุบัน"
+    assert back["waypoints"] == go["waypoints"][::-1]
+    assert back["departure_time"] == "2099-01-07T06:00:00Z"  # ไม่บอกเวลากลับ ใช้ 13:00 เท่าขาไป
+
+
+def test_return_before_departure_creates_nothing():
+    be = PlacesBackend([])
+    out, acts = tools.run("create_trip", {"origin": "กรุงเทพ", "destination": "เชียงใหม่", "date": "2099-01-05",
+                                          "time": "13:00", "return_date": "2099-01-05", "return_time": "09:00"}, be, AUTH)
+    assert acts == [] and "หลังเวลาออก" in out["error"]
+    assert not any(c[:2] == ("POST", "/api/v1/trips") for c in be.calls)
+
+
+def test_done_reply_tells_about_the_return_trip_too():
+    import llm
+    text = llm.done_reply([{"created": True, "name": "Trip 02", "route_th": "ก > ข", "departure_th": "5 ม.ค.",
+                            "return_trip": {"created": True, "name": "Trip 03", "route_th": "ข > ก", "departure_th": "7 ม.ค."}}])
+    assert "Trip 02" in text and "Trip 03" in text

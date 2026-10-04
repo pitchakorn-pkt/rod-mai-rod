@@ -92,6 +92,9 @@ SCHEMAS = [
             "date": {"type": "string", "description": "วันออกตามเวลาไทย YYYY-MM-DD"},
             "time": {"type": "string", "description": "เวลาออกตามเวลาไทย HH:MM"},
             "stops": {"type": "array", "items": {"type": "string"}, "description": "จุดแวะตามลำดับ ไม่เกิน 5 จุด"},
+            "return_date": {"type": "string",
+                            "description": "วันกลับตามเวลาไทย YYYY-MM-DD ถ้าผู้ใช้บอก ระบบสร้างทริปขากลับ (สลับต้นทางกับปลายทาง) ให้เอง"},
+            "return_time": {"type": "string", "description": "เวลาออกขากลับ HH:MM ไม่บอกใช้เวลาเดียวกับขาไป"},
         }, "required": ["origin", "destination", "date", "time"]},
     }},
     {"type": "function", "function": {
@@ -415,14 +418,26 @@ def same_trip(trips: list[dict], origin: dict, destination: dict, when: datetime
                  and near(t["destination"], destination)), None)
 
 
-def create_trip(args: dict, backend: Backend, auth: str, now: Optional[datetime] = None) -> tuple[dict, list]:
-    d = YMD.match(str(args.get("date") or "").strip())
-    t = HHMM.match(str(args.get("time") or "").strip())
+def thai_datetime(date, time) -> Optional[datetime]:
+    d = YMD.match(str(date or "").strip())
+    t = HHMM.match(str(time or "").strip())
     if not d or not t:
+        return None
+    return datetime(int(d.group(1)), int(d.group(2)), int(d.group(3)), int(t.group(1)), int(t.group(2)), tzinfo=BANGKOK)
+
+
+def create_trip(args: dict, backend: Backend, auth: str, now: Optional[datetime] = None) -> tuple[dict, list]:
+    when = thai_datetime(args.get("date"), args.get("time"))
+    if when is None:
         return {"error": "ต้องรู้วันและเวลาออก ให้ถามผู้ใช้"}, []
-    when = datetime(int(d.group(1)), int(d.group(2)), int(d.group(3)), int(t.group(1)), int(t.group(2)), tzinfo=BANGKOK)
     if when <= (now or datetime.now(timezone.utc)):
         return {"error": f"เวลาออก {thai_time(to_utc_iso(when))} ผ่านไปแล้ว"}, []
+    # ขากลับ: เช็กก่อนสร้างอะไร ผิดจะได้ไม่เหลือขาไปค้างครึ่งเดียว
+    back_when = None
+    if args.get("return_date"):
+        back_when = thai_datetime(args["return_date"], args.get("return_time") or args.get("time"))
+        if back_when is None or back_when <= when:
+            return {"error": "วันเวลากลับต้องหลังเวลาออกขาไป ให้ถามผู้ใช้อีกครั้ง"}, []
     origin, err = resolve_place(args.get("origin"), backend, auth)
     if err:
         return {"error": err}, []
@@ -439,7 +454,15 @@ def create_trip(args: dict, backend: Backend, auth: str, now: Optional[datetime]
     trip = backend("POST", "/api/v1/trips", auth, json={
         "origin": origin, "destination": destination, "departure_time": to_utc_iso(when), "waypoints": stops})
     actions = [{"type": "TRIP_CREATED", "trip_id": trip["trip_id"], "trip_no": trip["trip_no"]}]
-    return saved_and_planned(trip, backend, auth, {"created": True}), actions
+    result = saved_and_planned(trip, backend, auth, {"created": True})
+    if back_when and not same_trip(backend("GET", "/api/v1/trips", auth), destination, origin, back_when):
+        # สลับสถานที่ที่หาไว้แล้วตรงๆ ขากลับจึงจบที่ต้นทางเดิมเป๊ะ (เช่น ตำแหน่งปัจจุบัน) ไม่ให้โมเดลพิมพ์ชื่อเอง
+        back = backend("POST", "/api/v1/trips", auth, json={
+            "origin": destination, "destination": origin, "departure_time": to_utc_iso(back_when),
+            "waypoints": stops[::-1]})
+        actions.append({"type": "TRIP_CREATED", "trip_id": back["trip_id"], "trip_no": back["trip_no"]})
+        result["return_trip"] = saved_and_planned(back, backend, auth, {"created": True})
+    return result, actions
 
 
 def update_trip_places(args: dict, backend: Backend, auth: str) -> tuple[dict, list]:
