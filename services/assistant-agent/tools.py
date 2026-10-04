@@ -407,6 +407,14 @@ def hazards_now(args: dict, backend: Backend, auth: str) -> tuple[dict, list]:
     return out, []
 
 
+def same_trip(trips: list[dict], origin: dict, destination: dict, when: datetime) -> Optional[dict]:
+    """ทริปที่ต้นทาง ปลายทาง (ห่างไม่เกินราว 100 ม.) และเวลาออกตรงกัน = ทริปซ้ำ"""
+    def near(a: dict, b: dict) -> bool:
+        return abs(a["lat"] - b["lat"]) < 0.001 and abs(a["lng"] - b["lng"]) < 0.001
+    return next((t for t in trips if departs(t) == when and near(t["origin"], origin)
+                 and near(t["destination"], destination)), None)
+
+
 def create_trip(args: dict, backend: Backend, auth: str, now: Optional[datetime] = None) -> tuple[dict, list]:
     d = YMD.match(str(args.get("date") or "").strip())
     t = HHMM.match(str(args.get("time") or "").strip())
@@ -424,6 +432,10 @@ def create_trip(args: dict, backend: Backend, auth: str, now: Optional[datetime]
     stops, err = resolve_stops(args.get("stops") or [], backend, auth)
     if err:
         return {"error": err}, []
+    same = same_trip(backend("GET", "/api/v1/trips", auth), origin, destination, when)
+    if same:
+        # ผู้ใช้พิมพ์ "สร้างเลย" ซ้ำหลังสร้างไปแล้ว โมเดลเคยสร้างทริปเดิมซ้ำอีกอัน
+        return {"error": f"มี {label(same['trip_no'])} เส้นทางและเวลาออกนี้อยู่แล้ว ไม่ได้สร้างซ้ำ บอกผู้ใช้ว่าสร้างไว้แล้ว"}, []
     trip = backend("POST", "/api/v1/trips", auth, json={
         "origin": origin, "destination": destination, "departure_time": to_utc_iso(when), "waypoints": stops})
     actions = [{"type": "TRIP_CREATED", "trip_id": trip["trip_id"], "trip_no": trip["trip_no"]}]

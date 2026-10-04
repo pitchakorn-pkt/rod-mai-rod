@@ -278,3 +278,15 @@ def test_current_location_unknown_asks_for_origin():
     out, acts = tools.run("create_trip", {"origin": "ตำแหน่งปัจจุบัน", "destination": "เชียงใหม่",
                                           "date": "2099-01-05", "time": "13:00"}, be, AUTH)
     assert "ยังไม่รู้ตำแหน่งปัจจุบัน" in out["error"] and acts == []
+
+
+def test_same_route_and_time_is_not_created_twice():
+    be = PlacesBackend([])
+    args = {"origin": "ตำแหน่งปัจจุบัน", "destination": "เชียงใหม่", "date": "2099-01-05", "time": "13:00"}
+    _, first = tools.run("create_trip", args, be, AUTH, HERE)
+    out, second = tools.run("create_trip", args, be, AUTH, HERE)
+    assert first and second == [] and "อยู่แล้ว" in out["error"]
+    assert sum(c[:2] == ("POST", "/api/v1/trips") for c in be.calls) == 1
+    # ขากลับ (สลับทาง) หรือคนละเวลา ยังสร้างได้
+    _, back = tools.run("create_trip", {**args, "origin": "เชียงใหม่", "destination": "ตำแหน่งปัจจุบัน"}, be, AUTH, HERE)
+    assert back
