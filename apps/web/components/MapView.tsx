@@ -142,7 +142,7 @@ function buildPinIcon(p: MapPin) {
     return divIcon({ className: "pin-div-icon", iconSize: [0, 0], iconAnchor: [0, 0], html });
   }
 
-  const iconMarkup = renderToStaticMarkup(<Icon name={p.icon ?? "pin"} size={isSelected ? 18 : 15} stroke={2.4} />);
+  const iconMarkup = renderToStaticMarkup(<Icon name={p.icon ?? "pin"} size={isSelected ? 16 : 13} stroke={2.4} />);
   const html = `
     <div class="pin-beacon-wrap${isSelected ? " selected" : ""}${isStrong ? " strong" : ""}">
       <div class="pin-sonar-ground" style="--c:${p.color}"></div>
@@ -204,7 +204,8 @@ export default function MapView({ center = { lat: 13.7563, lng: 100.5018 }, zoom
   const ordered = [...routes].sort((a, b) => Number(!!a.active) - Number(!!b.active));
   return (
     <MapContainer center={[center.lat, center.lng]} zoom={zoom} style={{ height: "100%", width: "100%" }} zoomControl={false} attributionControl>
-      <TileLayer url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" className="base-tiles" />
+      {/* Esri ชื่อทุกประเทศเป็นภาษาอังกฤษภาษาเดียว (OpenStreetMap ใช้ภาษาท้องถิ่น ไทย พม่า จีน ปนกัน) ไม่ต้องใช้ key */}
+      <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}" attribution="Tiles &copy; Esri" maxNativeZoom={19} className="base-tiles" />
       {floodLayer && <TileLayer key={floodLayer} url={`/api/v1/maps/flood/${floodLayer}/{z}/{x}/{y}`} opacity={0.9} zIndex={2} attribution="น้ำท่วม &copy; GISTDA" />}
       {ordered.map((r) => (
         <Polyline

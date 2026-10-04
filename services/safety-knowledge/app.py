@@ -70,7 +70,7 @@ EMERGENCY = {
 class SearchIn(BaseModel):
     query: str
     hazard_types: list[str] = []
-    limit: int = Field(3, ge=1, le=10)
+    limit: int = Field(4, ge=1, le=10)
 
 
 def load_docs() -> list[dict]:
@@ -190,14 +190,25 @@ def search(body: SearchIn):
             ))
 
     hits.sort(key=lambda h: -h[0])
+    if not hits:
+        return ok({"results": [], "warnings": []})
 
-    unique_results = []
-    seen = set()
-    for _, item in hits:
-        key = (item["doc_id"], item["snippet_th"])
+    # เอกสารที่ตรงที่สุดเป็นหลัก: บรรทัดที่ตรงคำถามก่อน แล้วเติมบรรทัดอื่นของเอกสารนั้น (คำตอบได้ครบขั้นตอน
+    # ไม่ใช่ประโยคเดียว) เว้นที่ 1 บรรทัดให้เอกสารอื่นที่ตรงด้วย เผื่อคำถามคาบเกี่ยวหลายเรื่อง
+    top = next(d for d in DOCS if d["doc_id"] == hits[0][1]["doc_id"])
+    item = lambda doc, line: {"doc_id": doc["doc_id"], "title_th": doc["title_th"], "snippet_th": line, "source": doc["source"]}
+    primary = [h for _, h in hits if h["doc_id"] == top["doc_id"]]
+    primary += [item(top, line) for line in top["lines"] if line not in {h["snippet_th"] for h in primary}]
+    others = [h for _, h in hits if h["doc_id"] != top["doc_id"]]
+    room = body.limit - 1 if others and body.limit > 1 else body.limit
+    picked = primary[:room] + others
+
+    unique_results, seen = [], set()
+    for h in picked:
+        key = (h["doc_id"], h["snippet_th"])
         if key not in seen:
             seen.add(key)
-            unique_results.append(item)
+            unique_results.append(h)
             if len(unique_results) >= body.limit:
                 break
 

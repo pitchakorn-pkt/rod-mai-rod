@@ -10,6 +10,7 @@ from pathlib import Path
 import httpx
 
 from geo import THAILAND_BOUNDS, to_iso
+import doh
 import gistda
 import landslide
 import weather_pins
@@ -234,6 +235,9 @@ def get_hazards(box: Box, refresh: bool = False) -> tuple[list[dict], list[str]]
     # GISTDA flood extent, refreshed only in the background, never fetched here
     if not demo and gistda.enabled():
         hazards += [h for h in gistda.latest() if in_box(h["lat"], h["lng"], box)]
+    # น้ำท่วม/ปิดถนนบนทางหลวง (กรมทางหลวง) โหลดเบื้องหลังเหมือนกัน
+    if not demo and doh.enabled():
+        hazards += [h for h in doh.latest() if in_box(h["lat"], h["lng"], box)]
     return hazards, warnings
 
 

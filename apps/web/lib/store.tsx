@@ -21,6 +21,8 @@ export type NewTrip = { title: string; origin: ApiPlace; destination: ApiPlace; 
 export type Alert = { icon: string; tone: "sun" | "red" | "aqua"; text: string; href: string };
 
 const BANGKOK: LatLng = { lat: 13.7563, lng: 100.5018 };
+// คอมพิวเตอร์หาตำแหน่งจาก Wi-Fi อาจใช้เกิน 4 วิ ให้เวลาถึง 15 วิ
+const GEO_OPTIONS: PositionOptions = { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 };
 const THAILAND = "min_lat=5.6&min_lng=97.3&max_lat=20.5&max_lng=105.7";
 const TITLES_KEY = "rmr_redesign_titles";
 
@@ -61,6 +63,9 @@ export type LiveTrip = ReturnType<typeof toTrip>;
 type Store = {
   ready: boolean;
   email: string | null;
+  displayName: string | null;
+  setDisplayName: (name: string) => Promise<void>;
+  changePassword: (current: string, next: string) => Promise<void>;
   trips: LiveTrip[];
   tripsError: string | null;
   nextTrip: LiveTrip | null;
@@ -69,15 +74,17 @@ type Store = {
   floodWindow: string | null; // ชุดน้ำท่วม GISTDA ที่ระบบใช้อยู่ 3days / 7days
   emergency: Record<HazardType, Emergency>;
   here: LatLng;
+  hereFallback: boolean; // true = ยังไม่ได้ตำแหน่งจริง ใช้กรุงเทพแทน
+  locate: () => Promise<LatLng | null>;
   area: Area | null;
   nearby: NearbyPlace[] | null;
   nearbyError: string | null;
   alerts: Alert[];
   reloadTrips: () => Promise<void>;
-  createTrip: (t: NewTrip) => Promise<LiveTrip>;
+  createTrip: (t: NewTrip) => Promise<{ trip: LiveTrip; planError: string | null }>;
   planTrip: (id: string) => Promise<void>;
   deleteTrip: (id: string) => Promise<void>;
-  updateTrip: (id: string, t: NewTrip) => Promise<void>;
+  updateTrip: (id: string, t: NewTrip) => Promise<string | null>;
   shiftTrip: (id: string, hours: number) => Promise<void>;
 };
 
@@ -94,6 +101,7 @@ const SEV = { HIGH: 0, MEDIUM: 1, LOW: 2 } as const;
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
+  const [displayName, setDisplayNameState] = useState<string | null>(null);
   const [trips, setTrips] = useState<LiveTrip[]>([]);
   const [tripsError, setTripsError] = useState<string | null>(null);
   const [hazards, setHazards] = useState<Hazard[]>([]);
@@ -101,9 +109,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [floodWindow, setFloodWindow] = useState<string | null>(null);
   const [emergency, setEmergency] = useState<Record<HazardType, Emergency>>(SAMPLE_EMERGENCY);
   const [here, setHere] = useState<LatLng>(BANGKOK);
+  const [hereFallback, setHereFallback] = useState(true);
   const [area, setArea] = useState<Area | null>(null);
   const [nearby, setNearby] = useState<NearbyPlace[] | null>(null);
   const [nearbyError, setNearbyError] = useState<string | null>(null);
+
+  const loadAround = useCallback((p: LatLng, real = false) => {
+    setHere(p);
+    setHereFallback(!real);
+    api<Area>(`/weather/area?lat=${p.lat}&lng=${p.lng}`).then(setArea).catch(() => {});
+  }, []);
+
+  // ขอตำแหน่งจริงใหม่ (ปุ่ม "ตำแหน่งฉัน") ไม่ได้ = null ให้หน้าเว็บบอกผู้ใช้
+  const locate = useCallback(
+    () =>
+      new Promise<LatLng | null>((resolve) => {
+        if (!navigator.geolocation) return resolve(null);
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            loadAround(p, true);
+            resolve(p);
+          },
+          () => resolve(null),
+          GEO_OPTIONS,
+        );
+      }),
+    [loadAround],
+  );
 
   const reloadTrips = useCallback(async () => {
     try {
@@ -123,7 +156,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setReady(true);
       return;
     }
-    api<{ email: string }>("/me").then((u) => setEmail(u.email)).catch(() => {});
+    api<{ email: string; display_name: string | null }>("/me")
+      .then((u) => {
+        setEmail(u.email);
+        setDisplayNameState(u.display_name);
+      })
+      .catch(() => {});
     reloadTrips().finally(() => setReady(true));
     api<{ hazards: Hazard[]; flood_window?: string | null }>(`/hazards?${THAILAND}`)
       .then((d) => {
@@ -136,33 +174,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .then((g) => setEmergency((m) => ({ ...m, [t]: g })))
         .catch(() => {}),
     );
-    const loadAround = (p: LatLng) => {
-      setHere(p);
-      api<Area>(`/weather/area?lat=${p.lat}&lng=${p.lng}`).then(setArea).catch(() => {});
-    };
-    // ขอตำแหน่งจริง ไม่ให้/ไม่ตอบใน 4 วิ ใช้กรุงเทพฯ
-    let done = false;
-    const fallback = setTimeout(() => {
-      done = true;
-      loadAround(BANGKOK);
-    }, 4000);
-    navigator.geolocation?.getCurrentPosition(
-      (pos) => {
-        if (done) return;
-        clearTimeout(fallback);
-        done = true;
-        loadAround({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      },
-      () => {
-        if (done) return;
-        clearTimeout(fallback);
-        done = true;
-        loadAround(BANGKOK);
-      },
-      { timeout: 3500 },
-    );
+    // ขอตำแหน่งจริง ระหว่างรอใช้กรุงเทพไปก่อนหลัง 4 วิ (หน้าเว็บจะได้ไม่ว่าง) ได้ตำแหน่งจริงเมื่อไหร่ก็ใช้ตำแหน่งจริงแทน
+    const fallback = setTimeout(() => loadAround(BANGKOK), 4000);
+    locate().then((p) => {
+      clearTimeout(fallback);
+      if (!p) loadAround(BANGKOK);
+    });
     return () => clearTimeout(fallback);
-  }, [token, reloadTrips]);
+  }, [token, reloadTrips, loadAround, locate]);
+
+  // โปรไฟล์: ชื่อที่ให้น้องกิเลนเรียก และเปลี่ยนรหัสผ่าน (PATCH /me, POST /me/password)
+  const setDisplayName = useCallback(async (name: string) => {
+    const u = await api<{ display_name: string | null }>("/me", { method: "PATCH", body: { display_name: name } });
+    setDisplayNameState(u.display_name);
+  }, []);
+  const changePassword = useCallback(async (current: string, next: string) => {
+    await api("/me/password", { method: "POST", body: { current_password: current, new_password: next } });
+  }, []);
 
   const planTrip = useCallback(
     async (id: string) => {
@@ -172,6 +200,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [reloadTrips],
   );
 
+  const planOrReason = (id: string) =>
+    api(`/trips/${id}/plan`, { method: "POST" }).then(
+      () => null,
+      (e: Error) => `บันทึกทริปแล้ว แต่วางแผนไม่สำเร็จ: ${e.message}`,
+    );
+
   const createTrip = useCallback(
     async (t: NewTrip) => {
       const made = await api<ApiTrip>("/trips", {
@@ -179,9 +213,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         body: { origin: t.origin, destination: t.destination, departure_time: t.departure, waypoints: t.stops },
       });
       if (t.title) saveTitle(made.trip_id, t.title);
-      await api(`/trips/${made.trip_id}/plan`, { method: "POST" }).catch(() => {});
+      // ทริปบันทึกแล้วแม้วางแผนไม่สำเร็จ ส่งเหตุผลกลับไปให้หน้าทริปบอกผู้ใช้ (เช่น ระบบหาเส้นทางช้า)
+      const planError = await planOrReason(made.trip_id);
       await reloadTrips();
-      return toTrip(made, titles());
+      return { trip: toTrip(made, titles()), planError };
     },
     [reloadTrips],
   );
@@ -194,8 +229,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         body: { origin: t.origin, destination: t.destination, departure_time: t.departure, waypoints: t.stops },
       });
       saveTitle(id, t.title);
-      await api(`/trips/${id}/plan`, { method: "POST" }).catch(() => {});
+      const planError = await planOrReason(id);
       await reloadTrips();
+      return planError;
     },
     [reloadTrips],
   );
@@ -241,6 +277,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const value: Store = {
     ready,
     email,
+    displayName,
+    setDisplayName,
+    changePassword,
     trips,
     tripsError,
     nextTrip,
@@ -249,6 +288,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     floodWindow,
     emergency,
     here,
+    hereFallback,
+    locate,
     area,
     nearby,
     nearbyError,
@@ -274,6 +315,9 @@ export function loadDepartures(t: LiveTrip): Promise<Departure[]> {
   const now: Departure = { offset_h: 0, risk_level: t.plan.risk_level, risk_score: t.plan.risk_score, recommendation: t.plan.recommendation };
   depCache[key] ??= api<{ departures: Departure[] }>(`/trips/${t.trip_id}/departures`, { timeoutMs: 100000 })
     .then((d) => [now, ...d.departures])
-    .catch(() => [now]);
+    .catch(() => {
+      delete depCache[key]; // ไม่จำครั้งที่พัง เปิดทริปนี้อีกครั้งจะลองใหม่
+      return [now];
+    });
   return depCache[key];
 }

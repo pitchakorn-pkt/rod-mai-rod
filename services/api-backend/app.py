@@ -29,6 +29,7 @@ MAX_WAYPOINTS = 5
 PAST_GRACE = timedelta(hours=1)
 SAME_PLACE_KM = 0.5
 LOGIN_LIMIT = (10, 60)  # 10 ครั้งต่อนาทีต่อ IP กันเดารหัสผ่าน
+DISPLAY_NAME_MAX = 40
 CHAT_LIMIT = (10, 60)  # 10 ข้อความต่อนาทีต่อผู้ใช้ กันโควตา LLM ฟรีหมด
 DEPARTURE_OFFSETS_H = (3, 6)  # หน้าทริป "ออกเวลาไหนดี" เทียบกับเวลาเดิม
 ROUTE_FORECAST_STEP_KM = 15
@@ -65,6 +66,15 @@ class Place(BaseModel):
 class Credentials(BaseModel):
     email: str
     password: str = Field(min_length=6)
+
+
+class ProfileIn(BaseModel):
+    display_name: Optional[str] = None
+
+
+class PasswordIn(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=6)
 
 
 class LoginIn(BaseModel):
@@ -187,14 +197,38 @@ def login(body: LoginIn, request: Request):
     user = db.find_user_by_email(normalize_email(body.email))
     if user is None or not auth.check_password(body.password, user["password_hash"]):
         raise ApiError("UNAUTHORIZED", "อีเมลหรือรหัสผ่านไม่ถูกต้อง")
+    if auth.needs_rehash(user["password_hash"]):
+        db.set_password_hash(user["user_id"], auth.hash_password(body.password))
     # เลือก field เอง ห้ามส่ง password_hash ออกไป
     return ok({"token": auth.make_token(user["user_id"]),
-               "user": {"user_id": user["user_id"], "email": user["email"]}})
+               "user": {"user_id": user["user_id"], "email": user["email"], "display_name": user["display_name"]}})
 
 
 @app.get("/api/v1/me")
 def me(authorization: Optional[str] = Header(None)):
     return ok(current_user(authorization))
+
+
+@app.patch("/api/v1/me")
+def update_me(body: ProfileIn, authorization: Optional[str] = Header(None)):
+    user = current_user(authorization)
+    name = (body.display_name or "").strip() or None
+    if name and len(name) > DISPLAY_NAME_MAX:
+        raise ApiError("VALIDATION_ERROR", f"ชื่อยาวได้ไม่เกิน {DISPLAY_NAME_MAX} ตัวอักษร")
+    return ok(db.set_display_name(user["user_id"], name))
+
+
+@app.post("/api/v1/me/password")
+def change_password(body: PasswordIn, authorization: Optional[str] = Header(None)):
+    user = current_user(authorization)
+    # จำกัดเหมือน login กันเดารหัสเดิม
+    rate_limit(f"password:{user['user_id']}", *LOGIN_LIMIT)
+    if not auth.check_password(body.current_password, db.get_password_hash(user["user_id"])):
+        raise ApiError("VALIDATION_ERROR", "รหัสผ่านเดิมไม่ถูกต้อง")
+    if len(body.new_password.encode()) > 72:
+        raise ApiError("VALIDATION_ERROR", "รหัสผ่านยาวเกินไป")
+    db.set_password_hash(user["user_id"], auth.hash_password(body.new_password))
+    return ok({"changed": True})
 
 
 # ---------- trips ----------
@@ -360,8 +394,9 @@ def assistant_chat(body: ChatIn, authorization: Optional[str] = Header(None)):
     user = current_user(authorization)
     rate_limit(f"chat:{user['user_id']}", *CHAT_LIMIT)
     # ส่ง token ของผู้ใช้ไปด้วย assistant-agent ต้องใช้เรียกกลับมาแก้ทริป (CONTRACT หัวข้อ 5)
+    # ส่งชื่อที่ผู้ใช้ตั้งไว้ไปด้วย น้องกิเลนจะได้เรียกชื่อถูก
     return ok(call("ASSISTANT_AGENT_URL", "POST", "/api/v1/chat", timeout=ASSISTANT_TIMEOUT,
-                   json=body.model_dump(), headers={"Authorization": authorization}))
+                   json={**body.model_dump(), "user_name": user["display_name"]}, headers={"Authorization": authorization}))
 
 
 # ---------- places ----------

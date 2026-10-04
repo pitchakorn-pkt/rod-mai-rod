@@ -26,8 +26,18 @@ def _secret() -> str:
     return secret
 
 
+# bcrypt ค่าเริ่มต้น 12 ใช้ CPU ราว 300 ms ต่อครั้ง เครื่อง 1 CPU บน Render มีคน login พร้อมกัน 20 คนรอกัน 6 วิ
+# 10 เร็วขึ้น 4 เท่าและยังเดายากพอสำหรับเว็บนี้ hash เดิมที่เป็น 12 ยังตรวจได้ และ login ครั้งถัดไปจะเปลี่ยนเป็น 10 ให้
+BCRYPT_ROUNDS = 10
+
+
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt(BCRYPT_ROUNDS)).decode()
+
+
+def needs_rehash(password_hash: str) -> bool:
+    """รูปแบบ $2b$12$... ตัวเลขคือ rounds"""
+    return password_hash.split("$")[2] != f"{BCRYPT_ROUNDS:02d}"
 
 
 def check_password(password: str, password_hash: str) -> bool:

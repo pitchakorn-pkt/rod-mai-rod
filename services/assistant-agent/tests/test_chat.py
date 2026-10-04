@@ -208,3 +208,25 @@ def test_language_check_only_for_english_questions():
     assert not llm.wrong_language("ไม่มีฝนครับ", "ฝนตกไหม")
     assert not llm.wrong_language("โทร 1669", "1669?")
 
+
+
+def test_display_name_goes_into_the_model_context(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(agent, "safety_search", lambda q: [])
+    monkeypatch.setattr(agent, "trips_context", lambda auth: "")
+    monkeypatch.setattr(agent.llm, "answer", lambda *a, **k: seen.update(k) or {"reply": "ok", "actions": [], "warnings": []})
+    client.post("/api/v1/chat", headers=AUTH, json={"message": "ฉันชื่ออะไร", "user_name": "แพนด้า"})
+    assert "คุณแพนด้า" in seen["context"]
+    client.post("/api/v1/chat", headers=AUTH, json={"message": "ฉันชื่ออะไร"})
+    assert seen["context"] == ""
+
+
+def test_english_safety_question_is_searched_with_thai_words(monkeypatch):
+    asked = []
+    monkeypatch.setattr(agent, "call", lambda *a, **k: asked.append(k["json"]["query"]) or {"results": []})
+    agent.safety_search("What should I do if my car stalls in flood water?")
+    assert "รถดับกลางน้ำท่วม" in asked[-1] and "น้ำท่วม" in asked[-1]
+    agent.safety_search("รถดับกลางน้ำทำไง")  # ภาษาไทยส่งตามเดิม
+    assert asked[-1] == "รถดับกลางน้ำทำไง"
+    agent.safety_search("hello there")  # อังกฤษแต่ไม่มีคำสำคัญ ส่งตามเดิม
+    assert asked[-1] == "hello there"
