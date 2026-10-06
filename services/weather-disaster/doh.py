@@ -38,7 +38,9 @@ _lock = threading.Lock()
 
 
 def enabled() -> bool:
-    return os.getenv("DOH_HDMS", "true").lower() == "true"
+    # ปิดเป็นค่าเริ่มต้น: HDMS ตอบเฉพาะ IP ในไทย เซิร์ฟเวอร์จริงอยู่ต่างประเทศดึงไม่ได้
+    # เปิดด้วย DOH_HDMS=true เมื่อเซิร์ฟเวอร์อยู่ในไทย
+    return os.getenv("DOH_HDMS", "false").lower() == "true"
 
 
 def depth_cm(text) -> int:
