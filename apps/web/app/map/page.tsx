@@ -251,17 +251,18 @@ function RiskMap() {
               </span>
             </span>
           </button>
+          {/* แตะได้ทั้งแถว ไม่ต้องเล็งสวิตช์เล็กๆ บนมือถือ */}
           {TYPES.map((t) => (
-            <div key={t} className="layer">
+            <button key={t} className="layer" aria-pressed={on[t]} onClick={() => setOn({ ...on, [t]: !on[t] })}>
               <span className="card-icon" style={{ width: 32, height: 32, borderRadius: 10 }}>
                 <Icon name={HAZARD_META[t].icon} size={17} />
               </span>
               <span className="grow small">{HAZARD_META[t].label}</span>
               <span className="tiny muted">{counts[t]}</span>
-              <button className={`switch ${on[t] ? "on" : ""}`} aria-pressed={on[t]} aria-label={HAZARD_META[t].label} onClick={() => setOn({ ...on, [t]: !on[t] })} />
-            </div>
+              <span className={`switch ${on[t] ? "on" : ""}`} aria-hidden />
+            </button>
           ))}
-          <div className="layer">
+          <button className="layer layer-wide" aria-pressed={showFlood} onClick={() => setShowFlood(!showFlood)}>
             <span className="card-icon" style={{ width: 32, height: 32, borderRadius: 10, background: "#3d6fd6", color: "#fff" }}>
               <Icon name="flood" size={17} />
             </span>
@@ -270,8 +271,8 @@ function RiskMap() {
               <br />
               <span className="tiny muted">{floodWindow ? `GISTDA ${floodWindow === "7days" ? "7" : "3"} วันล่าสุด` : "GISTDA ยังไม่มีข้อมูล"}</span>
             </span>
-            <button className={`switch ${showFlood ? "on" : ""}`} aria-pressed={showFlood} aria-label="แสดงพื้นที่น้ำท่วมจากดาวเทียม" onClick={() => setShowFlood(!showFlood)} />
-          </div>
+            <span className={`switch ${showFlood ? "on" : ""}`} aria-hidden />
+          </button>
           <p className="label" style={{ margin: "12px 0 6px" }}>สีแผนที่</p>
           <div className="seg" style={{ width: "100%" }}>
             {MAP_STYLES.map((m) => (
@@ -295,7 +296,7 @@ function RiskMap() {
         </div>
         )}
 
-        <div className="map-fab" style={{ right: 16, bottom: 110 }}>
+        <div className="map-fab locate-fab">
           <button className="icon-btn" aria-label="ตำแหน่งของฉัน" onClick={async () => setFly({ ...((await locate()) ?? here), zoom: 11 })}>
             <Icon name="locate" />
           </button>

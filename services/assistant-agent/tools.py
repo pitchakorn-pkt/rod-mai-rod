@@ -74,8 +74,8 @@ SCHEMAS = [
     }},
     {"type": "function", "function": {
         "name": "hazards_now",
-        "description": "ภัยที่เกิดอยู่ตอนนี้ทั่วประเทศ หรือในจังหวัดที่ระบุ: น้ำท่วม/ถนนปิดบนทางหลวง (กรมทางหลวง) "
-                       "น้ำท่วมจากดาวเทียม ดินถล่ม แผ่นดินไหว ใช้ตอนผู้ใช้ถาม เช่น ช่วงนี้ที่ไหนน้ำท่วม ถนนไหนปิด "
+        "description": "ภัยที่เกิดอยู่ตอนนี้ทั่วประเทศ หรือในจังหวัดที่ระบุ: น้ำท่วมจากดาวเทียม (รวมถนนที่น้ำท่วม) "
+                       "ดินถล่ม แผ่นดินไหว ใช้ตอนผู้ใช้ถาม เช่น ช่วงนี้ที่ไหนน้ำท่วม ถนนไหนน้ำท่วม "
                        "โดยไม่ได้ถามรอบสถานที่เดียว (ถามรอบสถานที่ใช้ place_conditions)",
         "parameters": {"type": "object", "properties": {
             "province": {"type": "string", "description": "ชื่อจังหวัด เช่น นครสวรรค์ ไม่ระบุ = ทั้งประเทศ"},
@@ -396,10 +396,13 @@ def hazards_now(args: dict, backend: Backend, auth: str) -> tuple[dict, list]:
     high = sum(h.get("severity") == "HIGH" for h in found)
     closed = sum(h.get("source") == "DOH" and h.get("severity") == "HIGH" for h in found)
     where = f"จังหวัด{province}" if province else "ทั่วประเทศ"
+    summary = f"{where} มีภัย {len(found)} จุด ระดับสูง {high} จุด" if found else f"{where} ไม่มีรายงานภัยตอนนี้"
+    # นับถนนปิดเฉพาะตอนเปิดข้อมูลกรมทางหลวง (มีหมุด DOH) ไม่งั้น "0 จุด" ทำให้แชทตอบว่าไม่มีถนนปิดทั้งที่ไม่ได้เช็ค
+    if found and any(h.get("source") == "DOH" for h in feed.get("hazards", [])):
+        summary += f" (ทางหลวงที่ผ่านไม่ได้หรือน้ำลึกเกิน 35 ซม. {closed} จุด)"
     out: dict = {
         "note": "เป็นข้อมูลตอนนี้ ไม่ใช่พยากรณ์ล่วงหน้า",
-        "summary_th": (f"{where} มีภัย {len(found)} จุด ระดับสูง {high} จุด "
-                       f"(ทางหลวงที่ผ่านไม่ได้หรือน้ำลึกเกิน 35 ซม. {closed} จุด)") if found else f"{where} ไม่มีรายงานภัยตอนนี้",
+        "summary_th": summary,
         "hazards": [{"title_th": h.get("title_th"), "province": h.get("province"),
                      "type_th": HAZARD_TYPE_TH.get(h.get("hazard_type"), h.get("hazard_type")),
                      "severity_th": RISK_TH.get(h.get("severity"), "ไม่ทราบ"),

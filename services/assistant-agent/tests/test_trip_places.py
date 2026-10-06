@@ -223,6 +223,7 @@ def test_hazards_now_filters_by_province_and_type():
     ])
     out, _ = run("hazards_now", {"province": "จังหวัดนครสวรรค์"}, be)
     assert [h["title_th"] for h in out["hazards"]] == ["น้ำท่วม a"] and out["summary_th"].startswith("จังหวัดนครสวรรค์ มีภัย 1 จุด")
+    assert "ทางหลวง" not in out["summary_th"]  # ไม่มีข้อมูลกรมทางหลวง ห้ามบอกว่าถนนปิด 0 จุด
     out, _ = run("hazards_now", {"hazard_type": "LANDSLIDE_RISK"}, be)
     assert [h["title_th"] for h in out["hazards"]] == ["น้ำท่วม b"]
     out, _ = run("hazards_now", {"province": "ภูเก็ต"}, be)

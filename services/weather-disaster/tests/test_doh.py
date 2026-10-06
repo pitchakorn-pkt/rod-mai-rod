@@ -80,6 +80,11 @@ def test_get_hazards_adds_doh_in_box_only_when_live(monkeypatch):
     box = (h["lat"] - 0.01, h["lng"] - 0.01, h["lat"] + 0.01, h["lng"] + 0.01)
 
     monkeypatch.setenv("DEMO_MODE", "false")
+    monkeypatch.delenv("DOH_HDMS", raising=False)  # ค่าเริ่มต้น = ปิด
+    found, _ = hazard_feeds.get_hazards(box, refresh=True)
+    assert h["hazard_id"] not in [x["hazard_id"] for x in found]
+
+    monkeypatch.setenv("DOH_HDMS", "true")
     found, _ = hazard_feeds.get_hazards(box, refresh=True)
     assert h["hazard_id"] in [x["hazard_id"] for x in found]
 
