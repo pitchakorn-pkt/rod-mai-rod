@@ -162,6 +162,10 @@ body {
 
 a { color: inherit; text-decoration: none; }
 button { font: inherit; color: inherit; cursor: pointer; }
+
+/* กันการดีดเกินขอบ และ "ลากลงเพื่อรีเฟรช" ของเบราว์เซอร์มือถือ (Safari รองรับตั้งแต่ iOS 16 เก่ากว่านั้นข้ามไปเฉยๆ)
+   ลากจอแล้วจอนิ่ง ไม่หลุดไปรีโหลดหน้าเองตอนกำลังใช้แผนที่หรือพิมพ์แชท */
+html, body { overscroll-behavior: none; }
 input, select, textarea { font: inherit; color: inherit; }
 
 h1, h2, h3, h4 { margin: 0; line-height: 1.25; color: #ffffff; letter-spacing: -0.02em; }
@@ -733,6 +737,7 @@ html[data-map="dark"] .map, html[data-map="dark"] .map .leaflet-container { back
 }
 
 .map-fab { position: absolute; z-index: 500; display: grid; gap: 8px; }
+.locate-fab { right: 16px; bottom: 110px; }
 
 /* =========================================================
    FUTURISTIC CYBER-BEACON MAP PINS & MARKERS
@@ -1839,10 +1844,11 @@ html:not([data-theme="glass"]) .sos-card .ph.big .ph-num { color: #ffffff; }
 .layers-toggle { position: absolute; z-index: 600; left: 16px; top: 16px; box-shadow: var(--shadow-lg); background: rgba(10, 18, 32, 0.88); }
 @keyframes fold-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 
-.layer { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-top: 1px solid var(--line); }
-.layer:first-of-type { border-top: 0; }
+.layer { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 4px; border: 0; border-top: 1px solid var(--line); background: none; text-align: left; border-radius: 0; }
+.layers-head + .layer { border-top: 0; }
+.layer:focus-visible { outline: 2px solid var(--lime); outline-offset: -2px; border-radius: 10px; }
 
-.switch { position: relative; width: 42px; height: 24px; border-radius: 999px; background: rgba(255, 255, 255, 0.2); border: 0; flex: none; transition: background 0.15s; }
+.switch { display: inline-block; position: relative; width: 42px; height: 24px; border-radius: 999px; background: rgba(255, 255, 255, 0.2); border: 0; flex: none; transition: background 0.15s; }
 .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left 0.15s; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); }
 .switch.on { background: var(--lime); }
 .switch.on::after { left: 21px; background: #0c1805; }
@@ -2625,7 +2631,7 @@ html[data-sidebar="mini"] .sidebar-mascot img { width: 56px; margin: 0 auto; }
   .trips-layout { grid-template-columns: 1fr; }
   .trip-grid, .dash, .dash-pair { grid-template-columns: 1fr; }
   .trip-grid > .splitter { display: none; }
-  .home2, .home2-row { grid-template-columns: 1fr; }
+  .home2, .home2-row { grid-template-columns: minmax(0, 1fr); } /* minmax(0) ไม่ให้เนื้อหาข้างในดันการ์ดกว้างเกินจอเล็ก (iPhone SE) */
   .splitter { display: none !important; }
   .emer { grid-template-columns: 1fr; }
   .assist { grid-template-columns: 1fr; }
@@ -2638,6 +2644,11 @@ html[data-sidebar="mini"] .sidebar-mascot img { width: 56px; margin: 0 auto; }
   .main { padding: 16px 16px 110px; }
   .topbar { margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
   .topbar .title { flex-basis: 100%; order: -1; }
+  /* มือถือ: ปุ่มแถบบนอาจอยู่ชิดซ้าย (หน้าที่ไม่มีปุ่มใหญ่) เมนูที่กางชิดขวาของปุ่มจึงทะลุจอซ้าย
+     ให้เมนูยึดกับแถบบนแทน กางเต็มความกว้างใต้แถวปุ่ม ไม่ทะลุจอไม่ว่าปุ่มอยู่ตรงไหน */
+  .topbar { position: relative; }
+  .topbar .topbar-pop { position: static; }
+  .topbar :is(.theme-menu, .notif-menu, .profile-menu) { left: 0; right: 0; top: calc(100% + 8px); width: auto; min-width: 0; max-width: none; }
   .topbar > .btn { flex: 1; }
   h1 { font-size: calc(24px * var(--fs)); }
   
@@ -2695,13 +2706,38 @@ html[data-sidebar="mini"] .sidebar-mascot img { width: 56px; margin: 0 auto; }
   .trip-grid { gap: 16px; }
   .o-summary { order: 1; } .o-map { order: 2; } .o-depart { order: 3; } .o-stops { order: 4; } .o-check { order: 5; }
 
-  .mapfull { height: calc(100vh - 300px); min-height: 420px; }
-  .layers { width: auto; right: 16px; top: auto; bottom: 16px; left: 16px; max-height: 55%; overflow: auto; }
-  .layers-toggle { top: auto; bottom: 16px; }
-  .layers-fold { transform: rotate(90deg); }
-  .detail { left: 16px; right: 16px; width: auto; top: auto; bottom: 16px; max-height: 60%; }
-  .legend { top: 72px; bottom: auto; }
-  .map-search { left: 16px; right: 16px; width: auto; min-width: 0; transform: none; }
+  /* หน้าแผนที่บนมือถือ: แผนที่เต็มจอแบบแอปแผนที่ ซ่อนหัวข้อใหญ่ ทุกอย่างลอยบนแผนที่
+     ตรึงเต็มจอ เอกสารจึงไม่มีส่วนเกินจอให้ Safari ลากเด้ง ลากนิ้วบนแผนที่ = เลื่อนแผนที่อย่างเดียว */
+  html[data-page="map"] :is(body, .app) { min-height: 0; }
+  html[data-page="map"] .main { padding: 0; }
+  html[data-page="map"] .main > .topbar { display: none; }
+  .mapfull { position: fixed; inset: 0; height: auto; min-height: 0; z-index: 1; }
+  .mapfull .map { border: 0; border-radius: 0; }
+  .map-search { top: 12px; left: 12px; right: 12px; width: auto; min-width: 0; transform: none; }
+  .legend { top: 66px; left: 12px; bottom: auto; padding: 6px 12px; gap: 9px; font-size: calc(11.5px * var(--fs)); white-space: nowrap; max-width: calc(100% - 24px); overflow: hidden; }
+  .legend i { margin-right: 4px; }
+  .locate-fab { right: 12px; bottom: auto; top: 112px; }
+  /* ปุ่มและแผ่นด้านล่างอยู่เหนือแถบเมนู (แถบสูงราว 80px) */
+  .layers-toggle { top: auto; left: 12px; bottom: 92px; min-height: 48px; padding: 0 18px; }
+  /* แผงชั้นข้อมูล = ชิป 2 คอลัมน์ แตะทั้งชิป แผงเตี้ยพอเห็นแผนที่เปลี่ยนตอนกด น้ำท่วมจากดาวเทียมอยู่บนสุด */
+  .layers { left: 8px; right: 8px; top: auto; bottom: 92px; width: auto; max-height: 58%; background: rgba(10, 18, 32, 0.96); overflow: auto; overscroll-behavior: contain; padding: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-content: start; }
+  .layers > :not(.layer) { grid-column: 1 / -1; }
+  .layers-head { order: -2; margin-bottom: 0; }
+  .layers-fold { transform: rotate(90deg); width: 40px; height: 40px; }
+  .layers .label { margin: 4px 0 0 !important; }
+  .layers .seg { margin-top: 0 !important; }
+  .layers .seg button { min-height: 42px; }
+  .layer, .layers-head + .layer { min-height: 44px; padding: 4px 10px; gap: 8px; border: 1px solid var(--line); border-radius: 14px; opacity: 0.55; transition: background 0.15s, border-color 0.15s, opacity 0.15s; }
+  .layer[aria-pressed="true"] { opacity: 1; background: var(--lime-50); border-color: var(--lime); }
+  .layer .card-icon { width: 28px !important; height: 28px !important; border-radius: 8px !important; }
+  .layer .switch { display: none; }
+  .layer-wide { grid-column: 1 / -1; order: -1; }
+  .layer-wide .switch { display: inline-block; width: 50px; height: 30px; }
+  .layer-wide .switch::after { width: 24px; height: 24px; }
+  .layer-wide .switch.on::after { left: 23px; }
+  .detail { left: 8px; right: 8px; width: auto; top: auto; bottom: 92px; max-height: calc(100% - 200px); overscroll-behavior: contain; }
+  /* แผงเปิดอยู่ ซ่อนปุ่มน้องกิเลนที่ลอยทับมุมขวาล่าง */
+  body:has(.mapfull :is(.layers, .detail)) .chat-fab { display: none; }
   
   .auth { grid-template-columns: 1fr; }
   .auth-hero { min-height: 320px; padding: 28px; }
@@ -2807,6 +2843,9 @@ html[data-sidebar="mini"] .sidebar-mascot img { width: 56px; margin: 0 auto; }
    ========================================================= */
 /* สีไล่เฉดต้องเริ่มจากขอบนอก ไม่งั้นถูกวาดซ้ำเป็นลายในขอบโปร่งแสง มุมโผล่เป็นเหลี่ยม */
 .theme-dot { display: block; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--glass-border); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15); background-origin: border-box; background-repeat: no-repeat; }
+/* เมนูที่กางจากปุ่มแถบบน (ธีม / แจ้งเตือน / โปรไฟล์) จอคอมกางชิดขวาของปุ่ม */
+.topbar-pop { position: relative; }
+.notif-menu { position: absolute; right: 0; top: 50px; z-index: 1300; width: 340px; padding: 12px; box-shadow: var(--shadow-lg); }
 .theme-menu { position: absolute; right: 0; top: 50px; z-index: 1300; width: max-content; min-width: 220px; padding: 8px; display: grid; gap: 3px; box-shadow: var(--shadow-lg); }
 .theme-opt { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; cursor: pointer; font-size: calc(14px * var(--fs)); font-weight: 500; color: var(--ink); transition: background 0.15s; }
 .theme-opt:hover, .theme-opt.on { background: var(--lime-50); color: var(--lime); font-weight: 600; }

@@ -52,4 +52,4 @@
 - Auth: email+password custom, JWT
 - Auth เพิ่มเติม: เข้าสู่ระบบด้วย Google (ทำเพิ่ม 4 ต.ค.)
 - Font: เดิมวางไว้เป็น Prompt ตอนนี้ใช้ **Noto Sans Thai** ทั้งเว็บ (เก็บไฟล์ใน repo)
-- API ที่ใช้จริง: OSRM (เส้นทาง), Esri (แผนที่), Open-Meteo, GDACS, USGS, GISTDA (น้ำท่วมจากดาวเทียม), HDMS กรมทางหลวง (ถนนปิด), Photon + Overpass (สถานที่) · Longdo, Thaiwater/HII, TMD ที่วางแผนไว้ยังไม่ได้ต่อ รายละเอียดใน README หัวข้อ 3
+- API ที่ใช้จริง: OSRM (เส้นทาง), Esri (แผนที่), Open-Meteo, GDACS, USGS, GISTDA (น้ำท่วมจากดาวเทียม), HDMS กรมทางหลวง (ถนนปิด ปิดไว้เพราะตอบเฉพาะ IP ในไทย), Photon + Overpass (สถานที่) · Longdo, Thaiwater/HII, TMD ที่วางแผนไว้ยังไม่ได้ต่อ รายละเอียดใน README หัวข้อ 3
