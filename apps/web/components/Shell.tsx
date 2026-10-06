@@ -162,7 +162,7 @@ function ThemePicker() {
   }, []);
   const current = THEMES.find((t) => t.id === theme)!;
   return (
-    <div style={{ position: "relative" }}>
+    <div className="topbar-pop">
       <button className="icon-btn" onClick={() => setOpen(!open)} aria-label="ธีมและขนาดตัวอักษร" aria-expanded={open} title="ธีม ขนาดตัวอักษร และขนาดการ์ด">
         <span className="theme-dot" style={{ backgroundImage: current.swatch }} />
       </button>
@@ -233,13 +233,13 @@ export function Topbar({ title, sub, right }: { title: string; sub?: string; rig
       </div>
       {right}
       <ThemePicker />
-      <div style={{ position: "relative" }}>
+      <div className="topbar-pop">
         <button className="icon-btn" onClick={() => setOpen(!open)} aria-label="การแจ้งเตือน">
           <Icon name="bell" />
           {alerts.length > 0 && <span className="dot" />}
         </button>
         {open && (
-          <div className="card" style={{ position: "absolute", right: 0, top: 50, width: 340, zIndex: 1300, padding: 12, boxShadow: "var(--shadow-lg)" }}>
+          <div className="card notif-menu">
             <p className="bold" style={{ padding: "4px 6px 10px" }}>การแจ้งเตือน</p>
             <div className="stack" style={{ gap: 4 }}>
               {alerts.length === 0 && <p className="small muted" style={{ padding: "0 6px 6px" }}>ยังไม่มีเรื่องที่ต้องระวัง</p>}
@@ -316,7 +316,7 @@ function ProfileMenu() {
   }
 
   return (
-    <div style={{ position: "relative" }} ref={box}>
+    <div className="topbar-pop" ref={box}>
       <button className="avatar-btn" onClick={() => setOpen(!open)} aria-label="บัญชีของฉัน" aria-expanded={open} title="บัญชีของฉัน">
         <img className="avatar" src="/assets/shared/qilin-avatar.webp" alt="" />
       </button>

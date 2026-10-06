@@ -2644,6 +2644,11 @@ html[data-sidebar="mini"] .sidebar-mascot img { width: 56px; margin: 0 auto; }
   .main { padding: 16px 16px 110px; }
   .topbar { margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
   .topbar .title { flex-basis: 100%; order: -1; }
+  /* มือถือ: ปุ่มแถบบนอาจอยู่ชิดซ้าย (หน้าที่ไม่มีปุ่มใหญ่) เมนูที่กางชิดขวาของปุ่มจึงทะลุจอซ้าย
+     ให้เมนูยึดกับแถบบนแทน กางเต็มความกว้างใต้แถวปุ่ม ไม่ทะลุจอไม่ว่าปุ่มอยู่ตรงไหน */
+  .topbar { position: relative; }
+  .topbar .topbar-pop { position: static; }
+  .topbar :is(.theme-menu, .notif-menu, .profile-menu) { left: 0; right: 0; top: calc(100% + 8px); width: auto; min-width: 0; max-width: none; }
   .topbar > .btn { flex: 1; }
   h1 { font-size: calc(24px * var(--fs)); }
   
@@ -2838,6 +2843,9 @@ html[data-sidebar="mini"] .sidebar-mascot img { width: 56px; margin: 0 auto; }
    ========================================================= */
 /* สีไล่เฉดต้องเริ่มจากขอบนอก ไม่งั้นถูกวาดซ้ำเป็นลายในขอบโปร่งแสง มุมโผล่เป็นเหลี่ยม */
 .theme-dot { display: block; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--glass-border); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15); background-origin: border-box; background-repeat: no-repeat; }
+/* เมนูที่กางจากปุ่มแถบบน (ธีม / แจ้งเตือน / โปรไฟล์) จอคอมกางชิดขวาของปุ่ม */
+.topbar-pop { position: relative; }
+.notif-menu { position: absolute; right: 0; top: 50px; z-index: 1300; width: 340px; padding: 12px; box-shadow: var(--shadow-lg); }
 .theme-menu { position: absolute; right: 0; top: 50px; z-index: 1300; width: max-content; min-width: 220px; padding: 8px; display: grid; gap: 3px; box-shadow: var(--shadow-lg); }
 .theme-opt { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; cursor: pointer; font-size: calc(14px * var(--fs)); font-weight: 500; color: var(--ink); transition: background 0.15s; }
 .theme-opt:hover, .theme-opt.on { background: var(--lime-50); color: var(--lime); font-weight: 600; }
